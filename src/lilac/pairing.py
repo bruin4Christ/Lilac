@@ -34,7 +34,7 @@ from .signatures import (
     build_signatures,
     signature_from_smiles,
 )
-from .similarity import cosine_distance
+from .similarity import cosine_distance, weighted_cosine_distance
 
 # ---------------------------------------------------------------------------
 # Reference aroma profiles: a flavor defined by its character-impact compounds.
@@ -84,8 +84,24 @@ def rank_pairings(
     mode: str = "reinforce",
     target: float = 0.20,
     top: int = 10,
+    weights: np.ndarray | None = None,
+    band_on: str = "jaccard",
 ) -> list[dict]:
-    """Rank dataset flavors against `query` under the chosen mode."""
+    """Rank `flavor_sigs` against `query` under the chosen mode.
+
+    `weights` (optional, length N_BITS) scales the soft-cosine per sensor -- pass
+    IDF weights to stop ubiquitous bits from saturating the similarity.
+
+    `band_on` chooses what the reinforce/bridge/contrast bands sort on: ``jaccard``
+    (crisp bitmask overlap -- good for sparse single-flavor signatures) or
+    ``cosine`` (soft similarity -- needed for dense ingredient mixtures whose crisp
+    signatures collapse). For ``cosine`` bands, `target` is a similarity level.
+    """
+    def cos_sim(a, b):
+        d = (weighted_cosine_distance(a, b, weights) if weights is not None
+             else cosine_distance(a, b))
+        return 1.0 - d
+
     scored = []
     for name, sig in flavor_sigs.items():
         if name == query.descriptor:
@@ -94,18 +110,29 @@ def rank_pairings(
             "flavor": name,
             "n": sig.n_molecules,
             "jaccard": jaccard_bits(query.crisp, sig.crisp),
-            "cosine": 1.0 - cosine_distance(query.soft, sig.soft),
+            "cosine": cos_sim(query.soft, sig.soft),
         })
 
+    key = "cosine" if band_on == "cosine" else "jaccard"
     if mode == "reinforce":
         scored.sort(key=lambda r: (-r["cosine"], -r["jaccard"]))
-    elif mode == "bridge":
-        scored.sort(key=lambda r: abs(r["jaccard"] - target))
     elif mode == "contrast":
-        scored.sort(key=lambda r: (r["jaccard"], r["cosine"]))
+        scored.sort(key=lambda r: (r[key], r["cosine"]))
+    elif mode == "bridge":
+        tgt = target if band_on == "jaccard" else _bridge_target(scored, target)
+        scored.sort(key=lambda r: abs(r[key] - tgt))
     else:
         raise ValueError(f"unknown mode {mode!r}")
     return scored[:top]
+
+
+def _bridge_target(scored: list[dict], target: float) -> float:
+    """Cosine-band bridge target: the midpoint of the observed similarity range,
+    unless an explicit non-default target similarity was given."""
+    if abs(target - 0.20) > 1e-9:   # user passed an explicit similarity target
+        return target
+    sims = [r["cosine"] for r in scored]
+    return (min(sims) + max(sims)) / 2 if sims else target
 
 
 def _resolve_query(spec: str) -> tuple[FlavorSignature, list[str]]:

@@ -17,6 +17,7 @@ GitHub archive and cache them locally.
 from __future__ import annotations
 
 import os
+import re
 import urllib.request
 from pathlib import Path
 
@@ -154,3 +155,74 @@ def load_odorant_library(
         _DATA_DIR.mkdir(parents=True, exist_ok=True)
         lib.to_pickle(cache_path)
     return lib
+
+
+# ---------------------------------------------------------------------------
+# Ingredient layer: real culinary ingredients as superpositions of molecules.
+# Source: the Ahn et al. 2011 "Flavor Network" (Sci. Rep.) ingredient-compound
+# data. Compounds there are named (+ CAS) but carry no structures, so we map
+# each to a SMILES by matching its name against the odorant library.
+# ---------------------------------------------------------------------------
+_FLAVORNET_BASE = "https://raw.githubusercontent.com/lingcheng99/Flavor-Network/master/data"
+
+
+def _fetch_flavornet(filename: str) -> Path:
+    _DATA_DIR.mkdir(parents=True, exist_ok=True)
+    dest = _DATA_DIR / f"ahn_{filename}"
+    if not dest.exists():
+        urllib.request.urlretrieve(f"{_FLAVORNET_BASE}/{filename}", dest)
+    return dest
+
+
+def _norm_name(s: str) -> str:
+    """Loose normalisation for matching compound names across sources."""
+    s = str(s).lower().strip()
+    s = re.sub(r"\(.*?\)", "", s)                 # drop parenthetical stereo/notes
+    s = s.replace("alpha", "a").replace("beta", "b").replace("gamma", "g")
+    return re.sub(r"[^a-z0-9]", "", s)            # keep alnum only
+
+
+def load_flavor_network(min_compounds: int = 3, cache: bool = True) -> pd.DataFrame:
+    """Ingredients as lists of constituent-molecule SMILES.
+
+    Returns a DataFrame ``ingredient | category | n_compounds | smiles`` where
+    `smiles` is the list of the ingredient's aroma compounds that we could resolve
+    to a structure. Only ingredients with at least `min_compounds` resolved
+    molecules are kept (fewer than that is too thin to superimpose meaningfully).
+
+    Coverage note: ~65% of the ~1,100 named compounds map to a structure by name,
+    and the matched ones are the common aroma molecules, so well-studied
+    ingredients retain a representative profile. There are no concentrations, so a
+    signature weights every compound equally -- a known simplification.
+    """
+    cache_path = _DATA_DIR / f"flavor_network_min{min_compounds}.pkl"
+    if cache and cache_path.exists():
+        return pd.read_pickle(cache_path)
+
+    comp = pd.read_csv(_fetch_flavornet("comp_info.tsv"), sep="\t",
+                       names=["id", "name", "cas"], skiprows=1)
+    ingr = pd.read_csv(_fetch_flavornet("ingr_info.tsv"), sep="\t",
+                       names=["id", "name", "category"], skiprows=1)
+    pairs = pd.read_csv(_fetch_flavornet("ingr_comp.tsv"), sep="\t",
+                        names=["iid", "cid"], skiprows=1)
+
+    lib = load_odorant_library()
+    name_to_smiles = dict(zip(lib["name"].map(_norm_name), lib["smiles"]))
+    comp["smiles"] = comp["name"].map(_norm_name).map(name_to_smiles)
+    cid_to_smiles = dict(zip(comp["id"], comp["smiles"]))
+
+    pairs["smiles"] = pairs["cid"].map(cid_to_smiles)
+    grouped = (pairs.dropna(subset=["smiles"]).groupby("iid")["smiles"]
+               .apply(lambda s: sorted(set(s))))
+
+    out = ingr.assign(smiles=ingr["id"].map(grouped)).dropna(subset=["smiles"])
+    out["n_compounds"] = out["smiles"].map(len)
+    out = out[out["n_compounds"] >= min_compounds]
+    out = (out.rename(columns={"name": "ingredient"})
+           [["ingredient", "category", "n_compounds", "smiles"]]
+           .reset_index(drop=True))
+
+    if cache:
+        _DATA_DIR.mkdir(parents=True, exist_ok=True)
+        out.to_pickle(cache_path)
+    return out

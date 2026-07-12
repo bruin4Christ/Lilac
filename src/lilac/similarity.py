@@ -38,6 +38,22 @@ def cosine_distance(a: np.ndarray, b: np.ndarray) -> float:
     return 1.0 - float(np.dot(a, b) / (na * nb))
 
 
+def weighted_cosine_distance(a: np.ndarray, b: np.ndarray, weights: np.ndarray) -> float:
+    """Cosine distance after scaling each dimension by `weights`.
+
+    Used to down-weight ubiquitous sensors (methyl, ether) that fire for almost
+    every ingredient, so discriminative sensors (sulfur, pyrazine, macrocycle)
+    drive the similarity. 0.0 if either scaled vector is all-zero.
+    """
+    aw = a * weights
+    bw = b * weights
+    na = np.linalg.norm(aw)
+    nb = np.linalg.norm(bw)
+    if na == 0 or nb == 0:
+        return 0.0
+    return 1.0 - float(np.dot(aw, bw) / (na * nb))
+
+
 def nearest(query: np.ndarray, codes: np.ndarray, k: int = 5,
             metric: str = "jaccard") -> list[tuple[int, float]]:
     """Indices and distances of the k codes closest to `query`.

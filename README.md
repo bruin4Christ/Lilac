@@ -94,6 +94,36 @@ character-impact compounds (linalool, ethyl 2-methylbutanoate, (E)-2-hexenal, me
 cinnamate, …) in `pairing.REFERENCE_AROMAS` — sharper than leaning on a generic `berry`
 label. Build your own with `signatures.signature_from_smiles(name, smiles, weights)`.
 
+## Ingredient library
+
+A real ingredient isn't one molecule — it's a *mixture*, so its signature is the
+**superposition** of its constituent volatiles on the sensor panel (per bit, the
+fraction of the ingredient's compounds that fire it). Lilac builds **590 ingredients**
+from the [Ahn et al. *Flavor Network*](https://www.nature.com/articles/srep00196)
+ingredient–compound data, mapping each compound to a structure via the odorant library
+(~65% of compounds resolve; the matched ones are the common aroma molecules).
+
+```bash
+python scripts/build_ingredients.py                     # -> outputs/ingredient_signatures.csv
+python -m lilac.ingredients blueberry --mode all        # pair one ingredient vs the other 589
+python -m lilac.ingredients coffee   --mode reinforce   # coffee ~ cocoa, roasted peanut, beef
+python -m lilac.ingredients garlic   --mode contrast --no-idf
+```
+
+Because complex mixtures light up the common bits by default, plain cosine saturates
+near 1.0 for any two foods; **IDF weighting** (on by default) down-weights ubiquitous
+sensors so distinctive ones (sulfur, pyrazine, macrocycle) drive the match. Results are
+culinarily sensible:
+
+```
+coffee  ~ cocoa, roasted peanut, peanut butter, roasted beef   (Maillard cluster)
+garlic  ~ chive, shallot, onion, cabbage                        (allium / sulfur)
+blueberry contrast: goat milk, sour milk, brussels sprout       (fruity vs dairy/savory)
+```
+
+Caveat: the data carries no concentrations, so every compound is weighted equally — a
+known simplification (trace character-impact compounds are under-counted).
+
 ## Layout
 
 ```
@@ -105,6 +135,7 @@ src/lilac/
   mapviz.py       # 2-D map (UMAP -> t-SNE -> PCA fallback)
   validate.py     # kNN odor prediction + Morgan baseline + sanity checks
   pairing.py      # flavor pairing: reinforce / bridge / contrast + CLI
+  ingredients.py  # 590 real ingredients as superimposed mixtures + IDF pairing CLI
 scripts/          # thin CLI entry points for the steps above
 tests/            # known molecules light up the expected sensors
 ```
