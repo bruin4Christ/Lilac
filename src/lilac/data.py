@@ -22,28 +22,34 @@ from pathlib import Path
 
 import pandas as pd
 
-_RAW_BASE = "https://raw.githubusercontent.com/pyrfume/pyrfume-data/main/leffingwell"
+_PYRFUME_BASE = "https://raw.githubusercontent.com/pyrfume/pyrfume-data/main"
 _DATA_DIR = Path(os.environ.get("LILAC_DATA_DIR", "data"))
 
 # Non-label columns in behavior.csv / molecules.csv, excluded from the descriptor set.
 _ID_COL = "Stimulus"
 _MOL_ID_COL = "CID"
 
+# Pyrfume archives that ship a molecules.csv of the same schema. Every molecule in
+# these fragrance/flavor databases is a known odorant, so their union is a large
+# "known to smell like something" library even where per-molecule descriptors vary.
+LIBRARY_SOURCES = [
+    "leffingwell", "goodscents", "ifra_2019", "sigma_2014", "aromadb", "flavornet",
+]
 
-def _download(filename: str) -> Path:
-    """Fetch a raw CSV into the cache dir if not already present; return its path."""
+
+def _fetch(archive: str, filename: str) -> Path:
+    """Fetch a raw CSV from a pyrfume-data archive into the cache; return its path."""
     _DATA_DIR.mkdir(parents=True, exist_ok=True)
-    dest = _DATA_DIR / f"leffingwell_{filename}"
+    dest = _DATA_DIR / f"{archive}_{filename}"
     if not dest.exists():
-        url = f"{_RAW_BASE}/{filename}"
-        urllib.request.urlretrieve(url, dest)
+        urllib.request.urlretrieve(f"{_PYRFUME_BASE}/{archive}/{filename}", dest)
     return dest
 
 
 def load_raw() -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Return the raw (behavior, molecules) DataFrames, downloading if needed."""
-    behavior = pd.read_csv(_download("behavior.csv"))
-    molecules = pd.read_csv(_download("molecules.csv"))
+    """Return the raw Leffingwell (behavior, molecules) DataFrames."""
+    behavior = pd.read_csv(_fetch("leffingwell", "behavior.csv"))
+    molecules = pd.read_csv(_fetch("leffingwell", "molecules.csv"))
     return behavior, molecules
 
 
@@ -94,3 +100,57 @@ def load_dataset(cache: bool = True) -> tuple[pd.DataFrame, list[str]]:
         _DATA_DIR.mkdir(parents=True, exist_ok=True)
         df.to_pickle(cache_path)
     return df, descriptors
+
+
+def _canonical_smiles(smiles: str) -> str | None:
+    """RDKit canonical SMILES for de-duplication, or None if unparseable."""
+    from rdkit import Chem  # local import keeps data.py importable without RDKit
+
+    mol = Chem.MolFromSmiles(smiles) if isinstance(smiles, str) and smiles else None
+    return Chem.MolToSmiles(mol) if mol is not None else None
+
+
+def load_odorant_library(
+    sources: list[str] | None = None,
+    cache: bool = True,
+) -> pd.DataFrame:
+    """Union the molecule lists of several pyrfume archives into one library.
+
+    Returns a DataFrame ``cid | name | smiles | canonical_smiles | sources`` where
+    every row is a distinct odorant (deduplicated on canonical SMILES, falling back
+    to CID). Molecules carry no odor descriptors here -- the point is coverage: a
+    large set of compounds *known to smell like something*, beyond the ~3.5k labelled
+    Leffingwell molecules. Merge with ``load_dataset`` when you need the labels.
+    """
+    sources = sources or LIBRARY_SOURCES
+    cache_path = _DATA_DIR / f"odorant_library_{'_'.join(sources)}.pkl"
+    if cache and cache_path.exists():
+        return pd.read_pickle(cache_path)
+
+    frames = []
+    for src in sources:
+        try:
+            m = pd.read_csv(_fetch(src, "molecules.csv"))
+        except Exception as exc:  # a missing/unreachable archive shouldn't sink the rest
+            print(f"  ! skipping {src}: {exc}")
+            continue
+        m = m.rename(columns={_MOL_ID_COL: "cid", "IsomericSMILES": "smiles"})
+        m = m[["cid", "smiles", "name"]].dropna(subset=["smiles"])
+        m["source"] = src
+        frames.append(m)
+
+    lib = pd.concat(frames, ignore_index=True)
+    lib["canonical_smiles"] = lib["smiles"].map(_canonical_smiles)
+    lib = lib.dropna(subset=["canonical_smiles"])
+
+    # Dedupe on canonical structure; remember every source a molecule came from.
+    sources_by_mol = (lib.groupby("canonical_smiles")["source"]
+                      .agg(lambda s: ",".join(sorted(set(s)))))
+    lib = lib.drop_duplicates(subset="canonical_smiles", keep="first").copy()
+    lib["sources"] = lib["canonical_smiles"].map(sources_by_mol)
+    lib = lib.drop(columns="source").reset_index(drop=True)
+
+    if cache:
+        _DATA_DIR.mkdir(parents=True, exist_ok=True)
+        lib.to_pickle(cache_path)
+    return lib

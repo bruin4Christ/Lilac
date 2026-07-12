@@ -86,6 +86,24 @@ _DESCRIPTOR: list[tuple[str, Callable[[Chem.Mol], bool]]] = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# Larger-structure sensors, part 1: whole named scaffolds via SMARTS.
+# Unlike the "corner" detectors above, these fire on multi-ring / composite
+# frameworks -- the kind of large motif that carries a smell as a whole.
+# ---------------------------------------------------------------------------
+_LARGE_STRUCTURAL: list[tuple[str, str]] = [
+    ("indole",        "c1ccc2c(c1)cc[nH]2"),   # jasmine/animalic (indole, skatole)
+    ("coumarin",      "O=c1ccc2ccccc2o1"),      # sweet / hay / tonka
+    ("benzofuran",    "c1ccc2occc2c1"),         # smoky / phenolic bicyclic
+    ("quinoline",     "c1ccc2ncccc2c1"),        # leathery / animalic N-bicyclic
+    ("thiazole",      "c1cscn1"),               # roasted / meaty S,N ring
+    ("thiophene",     "c1cccs1"),               # savoury / alliaceous S ring
+    ("decalin",       "C1CCC2CCCCC2C1"),        # woody / ambery fused saturated bicyclic
+    ("oxane_ring",    "[#6]1[#6][#6][#6][#6][OX2]1"),  # tetrahydropyran (rose oxide, sugars)
+    ("polyene",       "C=CC=CC=C"),             # extended conjugation (carotenoid-like)
+]
+
+
 def _aromatic_fraction(mol: Chem.Mol) -> float:
     heavy = mol.GetNumHeavyAtoms()
     if heavy == 0:
@@ -99,17 +117,73 @@ def _has_stereocenter(mol: Chem.Mol) -> bool:
                                          includeUnassigned=True)) > 0
 
 
-# Compile SMARTS once at import time. A pattern that fails to compile is a bug
-# in the table above, so surface it loudly rather than silently skipping a bit.
-_STRUCT_PATTERNS: list[tuple[str, Chem.Mol]] = []
-for _name, _smarts in _STRUCTURAL:
-    _patt = Chem.MolFromSmarts(_smarts)
-    if _patt is None:
-        raise ValueError(f"Bad SMARTS for sensor {_name!r}: {_smarts!r}")
-    _STRUCT_PATTERNS.append((_name, _patt))
+def _largest_ring(mol: Chem.Mol) -> int:
+    rings = mol.GetRingInfo().AtomRings()
+    return max((len(r) for r in rings), default=0)
 
-BIT_NAMES: list[str] = [name for name, _ in _STRUCTURAL] + [name for name, _ in _DESCRIPTOR]
+
+# Isoprene unit (C5 building block of terpenes); >= 2 of them ~ a real terpenoid
+# skeleton rather than an incidental branch.
+_ISOPRENE = Chem.MolFromSmarts("C(=C)C")
+_LACTONE = Chem.MolFromSmarts("[CX3](=O)[OX2][#6;R]")
+
+
+def _is_macrolactone(mol: Chem.Mol) -> bool:
+    return mol.HasSubstructMatch(_LACTONE) and _largest_ring(mol) >= 10
+
+
+def _is_fused(mol: Chem.Mol) -> bool:
+    ri = mol.GetRingInfo()
+    return any(ri.NumAtomRings(a.GetIdx()) >= 2 for a in mol.GetAtoms())
+
+
+# ---------------------------------------------------------------------------
+# Larger-structure sensors, part 2: whole-molecule topology predicates.
+# These describe the scaffold at a scale no local substructure can: ring size,
+# fusion, poly-cyclicity, overall heavy-atom count.
+# ---------------------------------------------------------------------------
+_LARGE_TOPO: list[tuple[str, Callable[[Chem.Mol], bool]]] = [
+    ("macrocycle",     lambda m: _largest_ring(m) >= 12),   # macrocyclic musks
+    ("macrolactone",   _is_macrolactone),                   # musk lactones
+    ("multi_isoprene", lambda m: len(m.GetSubstructMatches(_ISOPRENE)) >= 2),  # terpenoid
+    ("fused_ring_sys", _is_fused),                          # any shared-edge ring system
+    ("polycyclic",     lambda m: m.GetRingInfo().NumRings() >= 3),
+    ("large_scaffold", lambda m: m.GetNumHeavyAtoms() >= 16),
+]
+
+
+def _compile(table: list[tuple[str, str]]) -> list[tuple[str, Chem.Mol]]:
+    """Compile a (name, SMARTS) table, failing loudly on a bad pattern."""
+    out = []
+    for name, smarts in table:
+        patt = Chem.MolFromSmarts(smarts)
+        if patt is None:
+            raise ValueError(f"Bad SMARTS for sensor {name!r}: {smarts!r}")
+        out.append((name, patt))
+    return out
+
+
+# Compile SMARTS once at import time. Small "corner" detectors and large scaffold
+# detectors are matched the same way, just kept in separate tables for clarity.
+_STRUCT_PATTERNS = _compile(_STRUCTURAL)
+_LARGE_PATTERNS = _compile(_LARGE_STRUCTURAL)
+
+# Bit order: small structural | large scaffolds | descriptors | large topology.
+_SMARTS_SENSORS = _STRUCT_PATTERNS + _LARGE_PATTERNS
+_PREDICATE_SENSORS = _DESCRIPTOR + _LARGE_TOPO
+
+BIT_NAMES: list[str] = (
+    [name for name, _ in _STRUCTURAL]
+    + [name for name, _ in _LARGE_STRUCTURAL]
+    + [name for name, _ in _DESCRIPTOR]
+    + [name for name, _ in _LARGE_TOPO]
+)
 N_BITS: int = len(BIT_NAMES)
+
+# Names of the larger-structure sensors, exposed for reporting / analysis.
+LARGE_STRUCTURE_BITS: list[str] = (
+    [name for name, _ in _LARGE_STRUCTURAL] + [name for name, _ in _LARGE_TOPO]
+)
 
 
 def encode(smiles: str) -> Optional[np.ndarray]:
@@ -118,16 +192,18 @@ def encode(smiles: str) -> Optional[np.ndarray]:
     if mol is None:
         return None
     bits = np.zeros(N_BITS, dtype=np.uint8)
-    for i, (_name, patt) in enumerate(_STRUCT_PATTERNS):
+    # All SMARTS sensors first (order: small structural, then large scaffolds).
+    for i, (_name, patt) in enumerate(_SMARTS_SENSORS):
         if mol.HasSubstructMatch(patt):
             bits[i] = 1
-    offset = len(_STRUCT_PATTERNS)
-    for j, (_name, predicate) in enumerate(_DESCRIPTOR):
+    # Then all predicate sensors (order: descriptors, then large topology).
+    offset = len(_SMARTS_SENSORS)
+    for j, (_name, predicate) in enumerate(_PREDICATE_SENSORS):
         try:
             if predicate(mol):
                 bits[offset + j] = 1
         except Exception:
-            # A descriptor that blows up on an odd molecule leaves its bit at 0
+            # A predicate that blows up on an odd molecule leaves its bit at 0
             # rather than sinking the whole encoding.
             pass
     return bits
