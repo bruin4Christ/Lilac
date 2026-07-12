@@ -1,0 +1,13 @@
+# Data caches and generated outputs (regenerable from scripts)
+data/
+outputs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+.venv/
+venv/
