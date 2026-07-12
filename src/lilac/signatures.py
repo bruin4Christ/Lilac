@@ -18,7 +18,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .sensors import BIT_NAMES, N_BITS
+from .sensors import BIT_NAMES, N_BITS, encode
 
 
 @dataclass
@@ -36,6 +36,41 @@ class FlavorSignature:
     def describe(self, k: int = 6) -> str:
         parts = [f"{name}({frac:.0%})" for name, frac in self.top_bits(k)]
         return f"{self.descriptor} [n={self.n_molecules}]: " + " + ".join(parts)
+
+
+def signature_from_smiles(
+    name: str,
+    smiles_list: list[str],
+    weights: list[float] | None = None,
+    threshold: float = 0.5,
+) -> tuple[FlavorSignature, list[str]]:
+    """Build a bespoke signature from a hand-picked set of molecules.
+
+    Use this to define a flavor by its actual character-impact aroma compounds
+    (e.g. blueberry = linalool + ethyl 2-methylbutanoate + (E)-2-hexenal + methyl
+    cinnamate + …) instead of relying on a dataset label. `weights` optionally
+    up-weights the most odour-defining compounds; equal weight if omitted.
+
+    Returns (signature, dropped) where `dropped` lists any SMILES that failed to
+    parse. The soft signature is the (weighted) fraction of the kept molecules
+    firing each sensor -- directly comparable to dataset flavor signatures.
+    """
+    rows, kept_w, dropped = [], [], []
+    for i, smi in enumerate(smiles_list):
+        bits = encode(smi)
+        if bits is None:
+            dropped.append(smi)
+            continue
+        rows.append(bits.astype(float))
+        kept_w.append(1.0 if weights is None else float(weights[i]))
+    if not rows:
+        raise ValueError(f"no parseable molecules for {name!r}")
+
+    codes = np.vstack(rows)
+    w = np.asarray(kept_w)
+    soft = (codes * w[:, None]).sum(axis=0) / w.sum()
+    crisp = (soft >= threshold).astype(np.uint8)
+    return FlavorSignature(name, len(rows), soft, crisp), dropped
 
 
 def build_signatures(

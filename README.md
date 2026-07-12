@@ -77,16 +77,34 @@ python -m lilac.validate              # prints prediction + sanity metrics
 
 Run the tests with `pytest`.
 
+## Flavor pairing
+
+Signatures make flavor pairing a one-liner. Query by a dataset label, a bespoke
+aroma profile, or raw SMILES:
+
+```bash
+python -m lilac.pairing blueberry --mode reinforce   # smells alike (shared-compound pairing)
+python -m lilac.pairing blueberry --mode bridge       # ~20% overlap: some shared, some new
+python -m lilac.pairing blueberry --mode contrast     # pairing by opposition
+python -m lilac.pairing "CCOC(=O)C,CC(C)=CCCC(C)(O)C=C" --mode all   # any molecule set
+```
+
+`blueberry` isn't a dataset label, so it's defined as a **bespoke signature** from its
+character-impact compounds (linalool, ethyl 2-methylbutanoate, (E)-2-hexenal, methyl
+cinnamate, …) in `pairing.REFERENCE_AROMAS` — sharper than leaning on a generic `berry`
+label. Build your own with `signatures.signature_from_smiles(name, smiles, weights)`.
+
 ## Layout
 
 ```
 src/lilac/
   sensors.py      # THE CORE: encode(smiles) -> uint8[55] + named bit table
   data.py         # fetch the Leffingwell set + union the 6.3k odorant library
-  signatures.py   # per-flavor signatures (soft + crisp)
+  signatures.py   # per-flavor signatures (soft + crisp); bespoke from SMILES
   similarity.py   # hamming / jaccard / cosine, nearest-neighbour lookup
   mapviz.py       # 2-D map (UMAP -> t-SNE -> PCA fallback)
   validate.py     # kNN odor prediction + Morgan baseline + sanity checks
+  pairing.py      # flavor pairing: reinforce / bridge / contrast + CLI
 scripts/          # thin CLI entry points for the steps above
 tests/            # known molecules light up the expected sensors
 ```
