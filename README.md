@@ -8,6 +8,26 @@ all molecules that smell "lemon", and you get lemon's own signature — the comp
 "smell number" for a flavor. (The panel width is a design knob — it started at 40 and
 grew to 55 when a larger-structure tier was added; see below.)
 
+## Launch the apps
+
+One command builds both web apps and serves them locally:
+
+```bash
+python scripts/launch.py          # build both + serve at http://127.0.0.1:8000
+#   make app                      # same thing, if you prefer make
+#   python scripts/launch.py --build-only   # just regenerate the HTML files
+```
+
+It prints a link to each:
+
+- **🌸 Pairing explorer** — `http://127.0.0.1:8000/lilac_pairings.html`
+- **🔬 Molecule inspector** — `http://127.0.0.1:8000/lilac_molecules.html`
+
+(First run fetches + caches the datasets, so give it a few seconds.) Prefer not to run
+anything? Both are also published as shareable artifacts from the chat.
+
+---
+
 This is a small, deliberately *legible* take on real olfactory science:
 
 | Idea in Lilac | Established science |
