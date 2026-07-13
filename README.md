@@ -146,7 +146,8 @@ The other side of the coin: pick a raw ingredient and see the **molecules inside
 each rendered as its 55-bit sensor signature (a colour-coded strip + hex) with its SMILES,
 plus the ingredient's **superimposed signature** — each sensor shaded by the fraction of
 its molecules that fire it. The 55 sensors are colour-grouped (structural / large scaffold
-/ physicochemical / topology). Click a molecule to name its active sensors.
+/ physicochemical / topology). Click a molecule to name its active sensors, or open the
+built-in **Bit index** for a plain-English gloss of what all 55 sensors detect.
 
 ## Layout
 

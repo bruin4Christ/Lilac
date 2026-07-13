@@ -29,6 +29,74 @@ from lilac.sensors import (  # noqa: E402
 )
 
 
+# Plain-English gloss for every sensor, keyed by its name in BIT_NAMES. Kept here
+# (next to the widget) so the in-app index reads for a non-chemist.
+DESCRIPTIONS: dict[str, str] = {
+    # structural "corners"
+    "hydroxyl": "an -OH group (alcohols and phenols)",
+    "primary_alcohol": "a terminal -CH2-OH",
+    "phenol": "an -OH on an aromatic ring (phenolic, medicinal)",
+    "carboxylic_acid": "a -COOH group (sour, acidic, cheesy)",
+    "ester": "an ester -C(=O)O- : the fruity workhorse of sweet aromas",
+    "lactone": "a cyclic ester (creamy, coconut, peach)",
+    "aldehyde": "a -CHO group (green, citrus, aldehydic)",
+    "ketone": "a C=O between two carbons (buttery, solventy)",
+    "ether": "a C-O-C linkage",
+    "acetal": "a C(OR)(OR) motif (green, fruity)",
+    "methyl": "a -CH3 group (fires for almost everything; low information)",
+    "gem_dimethyl": "two methyls on one carbon / isopropyl (terpene-like)",
+    "benzene_ring": "an aromatic six-ring (balsamic, sweet)",
+    "fused_aromatic": "naphthalene-type fused aromatic rings",
+    "aliphatic_ring": "a non-aromatic ring",
+    "alkene": "a C=C double bond",
+    "conjugated_diene": "two conjugated C=C bonds",
+    "terpene_isoprene": "a single isoprene unit (terpene building block)",
+    "amine": "an amine nitrogen, not an amide (fishy, animalic)",
+    "sulfur": "any sulfur atom (alliaceous, savory, sulfurous)",
+    "pyrazine": "a pyrazine ring (roasted, nutty, earthy)",
+    "furan": "a furan ring (bready, sweet, caramellic)",
+    "halogen": "an F, Cl, Br or I atom",
+    "acetyl": "a CH3-C=O group",
+    "methoxy": "an -OCH3 group",
+    "methoxy_phenol": "the guaiacol motif (vanilla, smoky, clove)",
+    "nitrogen_hetero": "aromatic nitrogen in a ring (roasted, green)",
+    "long_alkyl_chain": "six or more CH2 in a row (fatty, waxy)",
+    "branched_chain": "a heavily branched / quaternary carbon",
+    # large scaffolds
+    "indole": "the indole bicyclic (jasmine, floral, animalic)",
+    "coumarin": "coumarin (hay, tonka, sweet)",
+    "benzofuran": "a benzofuran bicyclic (smoky, phenolic)",
+    "quinoline": "a quinoline N-bicyclic (leathery, animalic)",
+    "thiazole": "a thiazole S,N ring (roasted, meaty, nutty)",
+    "thiophene": "a thiophene S ring (savory, alliaceous)",
+    "decalin": "a fused saturated bicyclic (woody, ambery)",
+    "oxane_ring": "a tetrahydropyran ring (rose oxide, sugars)",
+    "polyene": "an extended conjugated chain (carotenoid-like)",
+    # physicochemical
+    "mw_low": "light molecule, MW under 120 (volatile)",
+    "mw_high": "heavy molecule, MW over 200 (less volatile)",
+    "logp_low": "hydrophilic (logP under 1)",
+    "logp_high": "greasy / fatty (logP over 3)",
+    "high_tpsa": "large polar surface area (polar molecule)",
+    "flexible": "five or more rotatable bonds (floppy)",
+    "hbond_donor": "has a hydrogen-bond donor (OH / NH)",
+    "hbond_acceptors": "three or more hydrogen-bond acceptors",
+    "aromatic_rich": "over half the atoms are aromatic",
+    "multi_ring": "two or more rings",
+    "has_stereocenter": "has a chiral centre",
+    # whole-molecule topology
+    "macrocycle": "a ring of 12+ atoms (macrocyclic musk)",
+    "macrolactone": "a large-ring lactone (musk lactone)",
+    "multi_isoprene": "two or more isoprene units (terpenoid skeleton)",
+    "fused_ring_sys": "any shared-edge ring system",
+    "polycyclic": "three or more rings",
+    "large_scaffold": "a big molecule, 16+ heavy atoms",
+}
+
+GROUP_NAMES = ["structural “corner” detectors", "larger scaffolds",
+               "physicochemical properties", "whole-molecule topology"]
+
+
 def sensor_groups() -> list[int]:
     """Group id per bit: 0 structural, 1 large-scaffold, 2 physicochemical, 3 topology."""
     sizes = [len(_STRUCTURAL), len(_LARGE_STRUCTURAL), len(_DESCRIPTOR), len(_LARGE_TOPO)]
@@ -74,6 +142,8 @@ def build_data() -> dict:
     return {
         "sensors": BIT_NAMES,
         "groups": sensor_groups(),
+        "groupNames": GROUP_NAMES,
+        "desc": [DESCRIPTIONS.get(n, "") for n in BIT_NAMES],
         "mols": mols,
         "ings": ingredients,
     }
@@ -180,6 +250,25 @@ body{background:var(--bg)}
 .listhead{display:flex;justify-content:space-between;align-items:baseline;margin:2px 0 10px}
 .listhead h3{margin:0;font-size:15px}
 .listhead .sort{font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+/* bit index */
+.index{margin-top:26px;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.index>summary{cursor:pointer;list-style:none;padding:14px 18px;font-weight:600;font-size:15px;
+  display:flex;align-items:center;gap:10px}
+.index>summary::-webkit-details-marker{display:none}
+.index>summary .caret{color:var(--muted);font-family:var(--mono);font-size:13px;transition:transform .15s}
+.index[open]>summary .caret{transform:rotate(90deg)}
+.index>summary .sub{color:var(--muted);font-weight:400;font-size:13px}
+.idxbody{padding:4px 18px 18px}
+.idxgroup{margin-top:16px}
+.idxgroup h4{font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px;
+  display:flex;align-items:center;gap:8px}
+.idxgroup h4 i{width:11px;height:11px;border-radius:3px;display:inline-block}
+.idxrow{display:grid;grid-template-columns:34px 150px 1fr;gap:10px;align-items:baseline;
+  padding:5px 0;border-top:1px solid var(--border)}
+.idxrow .bi{font-family:var(--mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.idxrow .bn{font-family:var(--mono);font-size:13px;color:var(--text)}
+.idxrow .bd{color:var(--muted);font-size:13px}
+@media (max-width:640px){.idxrow{grid-template-columns:28px 1fr}.idxrow .bd{grid-column:2}}
 .foot{margin-top:24px;color:var(--muted);font-size:12.5px;max-width:80ch}
 .foot code{font-family:var(--mono);background:var(--surface-2);padding:1px 5px;border-radius:5px}
 @media (prefers-reduced-motion:no-preference){.panel,.mol{transition:opacity .16s ease}.fade{opacity:0}}
@@ -200,6 +289,7 @@ body{background:var(--bg)}
       <div class="menu" id="menu" role="listbox"></div>
     </div>
     <button class="btn" id="rand" type="button">🎲 Surprise me</button>
+    <button class="btn" id="idxbtn" type="button">≣ Bit index</button>
     <button class="btn" id="theme" type="button" aria-label="Toggle theme">◑ Theme</button>
   </div>
 
@@ -225,6 +315,12 @@ body{background:var(--bg)}
   </div>
   <div id="mollist"></div>
 
+  <details class="index" id="index">
+    <summary><span class="caret">▸</span> The 55 sensors — what each bit means
+      <span class="sub">· index &amp; colour key</span></summary>
+    <div class="idxbody" id="idxbody"></div>
+  </details>
+
   <p class="foot">55-bit signatures from <code>lilac.sensors</code>; molecules per ingredient from
     the Ahn <em>et al.</em> Flavor Network (compounds resolved to structures by name, ~65%
     coverage). A molecule's cell is lit when its sensor fires; the superimposed strip shades each
@@ -233,7 +329,7 @@ body{background:var(--bg)}
 
 <script>
 const DATA = /*__DATA__*/;
-const {sensors, groups, mols, ings} = DATA;
+const {sensors, groups, groupNames, desc, mols, ings} = DATA;
 const NB = sensors.length;
 const el = id => document.getElementById(id);
 const cap = s => String(s).replace(/_/g," ");
@@ -248,17 +344,36 @@ function hexOf(bits){let v=0n;for(const b of bits)v|=(1n<<BigInt(NB-1-b));
 function stripHTML(fill){
   let h="";
   for(let i=0;i<NB;i++){
-    let style="", lit=false, title=sensors[i];
+    let style="", lit=false;
+    let title=`${sensors[i]} — ${desc[i]}`;
     if(fill instanceof Set){
       if(fill.has(i)){lit=true;style=`background:${gcol(groups[i])}`;}
     }else{
       const v=fill[i]||0;
-      if(v>0){lit=true;title+=` — ${Math.round(v*100)}% of molecules`;
+      if(v>0){lit=true;title+=`  ·  ${Math.round(v*100)}% of molecules`;
         style=`background:${gcol(groups[i])};opacity:${(0.18+0.82*v).toFixed(2)}`;}
     }
     h+=`<span class="cell${lit?' lit':''}" style="${style}" title="${title}"></span>`;
   }
   return h;
+}
+
+// static reference: all 55 bits, grouped and glossed
+function buildIndex(){
+  let h="";
+  const order=[...groups.keys()].sort((a,b)=>groups[a]-groups[b]||a-b);
+  let cur=-1;
+  for(const i of order){
+    if(groups[i]!==cur){
+      if(cur!==-1) h+="</div>";
+      cur=groups[i];
+      h+=`<div class="idxgroup"><h4><i style="background:${gcol(cur)}"></i>${groupNames[cur]}</h4>`;
+    }
+    h+=`<div class="idxrow"><span class="bi">bit ${i}</span>
+      <span class="bn">${sensors[i]}</span><span class="bd">${desc[i]}</span></div>`;
+  }
+  h+="</div>";
+  el("idxbody").innerHTML=h;
 }
 
 function render(i){
@@ -323,6 +438,7 @@ q.addEventListener("keydown",e=>{if(!menu.classList.contains("open"))return;
   else if(e.key==="Enter"&&active>=0){go(filtered[active][1]);closeMenu();e.preventDefault();}
   else if(e.key==="Escape"){closeMenu();}});
 el("rand").onclick=()=>go(Math.floor(Math.random()*ings.length));
+el("idxbtn").onclick=()=>{const d=el("index");d.open=true;d.scrollIntoView({behavior:"smooth",block:"start"});};
 el("theme").onclick=()=>{const r=document.documentElement;
   const cur=r.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");
   r.setAttribute("data-theme",cur==="dark"?"light":"dark");};
@@ -331,6 +447,7 @@ function start(){const h=decodeURIComponent(location.hash.slice(1));
   let i=ings.findIndex(g=>g.name===h);
   if(i<0)i=ings.findIndex(g=>g.name==="coffee");
   if(i<0)i=0;render(i);}
+buildIndex();
 start();
 </script>
 """
