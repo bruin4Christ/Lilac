@@ -136,6 +136,18 @@ IDF-weighted similarity meter, and the distinctive sensor that bridges the two
 ("garlic ~ chive *via sulfur*"). Click any partner to re-center; 🎲 jumps at random. No
 external requests — all 590 ingredients' pairings are precomputed and embedded.
 
+### Molecule inspector (HTML app)
+
+```bash
+python scripts/build_molecule_widget.py    # -> outputs/lilac_molecules.html
+```
+
+The other side of the coin: pick a raw ingredient and see the **molecules inside it**,
+each rendered as its 55-bit sensor signature (a colour-coded strip + hex) with its SMILES,
+plus the ingredient's **superimposed signature** — each sensor shaded by the fraction of
+its molecules that fire it. The 55 sensors are colour-grouped (structural / large scaffold
+/ physicochemical / topology). Click a molecule to name its active sensors.
+
 ## Layout
 
 ```
