@@ -124,6 +124,18 @@ blueberry contrast: goat milk, sour milk, brussels sprout       (fruity vs dairy
 Caveat: the data carries no concentrations, so every compound is weighted equally — a
 known simplification (trace character-impact compounds are under-counted).
 
+### Pairing explorer (HTML app)
+
+```bash
+python scripts/build_app.py            # -> outputs/lilac_pairings.html (self-contained)
+```
+
+Generates a single static page: pick a base ingredient and its **reinforce / bridge /
+contrast** lists appear side by side, each row showing the partner's category, an
+IDF-weighted similarity meter, and the distinctive sensor that bridges the two
+("garlic ~ chive *via sulfur*"). Click any partner to re-center; 🎲 jumps at random. No
+external requests — all 590 ingredients' pairings are precomputed and embedded.
+
 ## Layout
 
 ```
