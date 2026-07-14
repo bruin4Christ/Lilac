@@ -2,8 +2,8 @@
 
     python scripts/build_molecule_widget.py
 
-Pick a raw ingredient and inspect the molecules inside it: each molecule's 55-bit
-sensor signature (as a colour-coded strip + hex), its SMILES, and the ingredient's
+Pick a raw ingredient and inspect the molecules inside it: each molecule's per-sensor
+signature (as a colour-coded strip + hex), its SMILES, and the ingredient's
 own superimposed signature (per sensor, the fraction of its molecules that fire it).
 Writes outputs/lilac_molecules.html. No external requests.
 """

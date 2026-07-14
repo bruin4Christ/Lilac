@@ -102,6 +102,11 @@ _LARGE_STRUCTURAL: list[tuple[str, str]] = [
     ("decalin",       "C1CCC2CCCCC2C1"),        # woody / ambery fused saturated bicyclic
     ("oxane_ring",    "[#6]1[#6][#6][#6][#6][OX2]1"),  # tetrahydropyran (rose oxide, sugars)
     ("polyene",       "C=CC=CC=C"),             # extended conjugation (carotenoid-like)
+    # celery / lovage / angelica. A 5-membered lactone fused to a 6-ring; the
+    # any-bond (~) fusion catches aromatic phthalides AND the dihydro forms
+    # (ligustilide, sedanolide), while excluding phthalic anhydride (its position-3
+    # ring atom is a second carbonyl). Fires on ~0.17% of the odorant library.
+    ("phthalide",     "O=C1O[#6;!$([CX3]=O)][#6]2~[#6]1~[#6]~[#6]~[#6]~[#6]~2"),
 ]
 
 

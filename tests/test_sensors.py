@@ -14,9 +14,11 @@ from lilac.sensors import (
 
 
 def test_bit_count_and_names_unique():
-    assert N_BITS == 55
-    assert len(BIT_NAMES) == N_BITS
-    assert len(set(BIT_NAMES)) == N_BITS  # no duplicate sensor names
+    # Panel-agnostic: the count is whatever the sensor tables define (it grows over
+    # time), but the structural invariants must always hold.
+    assert N_BITS == len(BIT_NAMES)
+    assert N_BITS >= 56                    # the panel only grows; never silently shrink
+    assert len(set(BIT_NAMES)) == N_BITS   # no duplicate sensor names
     assert set(LARGE_STRUCTURE_BITS).issubset(set(BIT_NAMES))
 
 
@@ -61,6 +63,10 @@ def test_known_molecules_hit_expected_bits(name, smiles, expected):
         ("coumarin", "O=c1ccc2ccccc2o1", {"coumarin", "fused_ring_sys"}),
         ("indole", "c1ccc2[nH]ccc2c1", {"indole", "fused_ring_sys"}),
         ("limonene", "CC1=CCC(CC1)C(=C)C", {"multi_isoprene"}),
+        # phthalide (celery/lovage): aromatic, butylidene (lovage), and dihydro forms.
+        ("butylidenephthalide", "CCC/C=C\\1/C2=CC=CC=C2C(=O)O1", {"phthalide"}),
+        ("3-n-butylphthalide", "CCCCC1OC(=O)c2ccccc21", {"phthalide"}),
+        ("ligustilide", "CCC/C=C1\\C2=C(CCC=C2)C(=O)O1", {"phthalide"}),
     ],
 )
 def test_large_structure_sensors(name, smiles, expected):
@@ -69,6 +75,20 @@ def test_large_structure_sensors(name, smiles, expected):
     on = set(active_names(bits))
     missing = expected - on
     assert not missing, f"{name}: expected large sensors not on: {missing} (got {on})"
+
+
+@pytest.mark.parametrize(
+    "name, smiles",
+    [
+        ("phthalic_anhydride", "O=C1OC(=O)c2ccccc21"),   # position-3 is a 2nd carbonyl
+        ("coumarin", "O=c1ccc2ccccc2o1"),                # 6-membered lactone, not 5
+        ("delta_decalactone", "CCCCCC1CCCCC(=O)O1"),     # unfused macrolactone
+    ],
+)
+def test_phthalide_excludes_decoys(name, smiles):
+    bits = encode(smiles)
+    assert bits is not None
+    assert "phthalide" not in set(active_names(bits)), f"{name} should not fire phthalide"
 
 
 def test_tiny_molecule_has_no_large_structure_bits():
