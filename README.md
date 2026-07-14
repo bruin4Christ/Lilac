@@ -153,6 +153,45 @@ levers address this:
   `build_ingredient_signatures(concentrations={"coffee": {"<smiles>": weight, ...}})`
   overrides the estimate per compound; anything missing falls back to the chosen weighting.
 
+## Composition — building a dish, not just a pair
+
+Pairing answers "what goes with X?"; a recipe is a *composition* problem. `compose`
+grows a small ensemble from a base ingredient, greedily adding the partner that
+brings the most **new distinctive aroma** while still sharing a **bridge** with
+what is already on the plate:
+
+```bash
+python -m lilac.compose coffee --size 4      # coffee + popcorn + filbert + ...  (roasted/nutty)
+python -m lilac.compose garlic --size 4      # garlic ~ durian, grape brandy, boiled beef (sulfur family)
+python -m lilac.compose blueberry --size 5   # fruit + herb/terpene bridges
+```
+
+Each addition is scored on four interpretable, tunable forces:
+
+- **complementarity + coherence** — coherence to the palette so far leads (keeping
+  the dish connected and base-specific), with a bonus for the single best *new*
+  distinctive note. Scoring runs on the smell-carrying sensors only (the 11 gross
+  physicochemical descriptors are excluded so broad ingredients don't dominate).
+- **bridge** — every pick names the distinctive sensor it joins on ("cocoa *via*
+  pyrazine"), and reports the new sensors it introduces.
+- **surprise** — a bonus for a bridging pick from a *different culinary category*
+  (the food-pairing hypothesis: unexpected foods sharing a key aroma), e.g.
+  beef → roasted shrimp *via pyrazine*.
+- **challenge** — a *non-eliminating* hedonic flag. Ingredients leaning on
+  polarizing notes (sulfur, amine, indole…) get a ⚠ warning, and *optionally* a
+  gentle ranking nudge (`--challenge-weight`, default **0** = warn only). It never
+  filters: a bold pairing (durian, blue cheese, garlic) is always reachable.
+
+```
+$ python -m lilac.compose garlic --size 3
+Dish built on garlic:
+  [base     ] garlic
+      ⚠ leans challenging (sulfur, thiazole, phenol)
+  [reinforce] durian        via sulfur; adds ester, ether, methoxy; vegetable→fruit leap
+      ⚠ leans challenging (sulfur, amine, thiazole)
+  [reinforce] boiled_beef   via sulfur; adds pyrazine, ketone, carboxylic_acid; vegetable→meat leap
+```
+
 ### Pairing explorer (HTML app)
 
 ```bash
@@ -190,6 +229,7 @@ src/lilac/
   validate.py     # kNN odor prediction + Morgan baseline + sanity checks
   pairing.py      # flavor pairing: reinforce / bridge / contrast + CLI
   ingredients.py  # 590 real ingredients as superimposed mixtures + IDF pairing CLI
+  compose.py      # build a dish: coherence-led ensemble + surprise + hedonic warnings
 scripts/          # thin CLI entry points for the steps above
 tests/            # known molecules light up the expected sensors
 ```
