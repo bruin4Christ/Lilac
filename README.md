@@ -251,6 +251,31 @@ cocoa ~ roasted_peanut, roasted_filbert, coffee, soybean   (the roasted / Mailla
 cocoa ∩ hazelnut: 6,7-dihydro-2,3-dimethyl-5H-cyclopentapyrazine, 2-phenylethanol, …
 ```
 
+## Flavor triangles
+
+A pairing is an edge; `lilac.triangles` finds closed **A–B–C bridge cycles** — three
+ingredients where every pair bridges, and (the magic) each edge is carried by a
+*different* note family, so the trio spans three aromas at once instead of three shades
+of one. Results are ranked by note-family diversity, so the most complementary triangles
+come first; `--magical` hard-requires three distinct families across three culinary
+categories.
+
+```bash
+python -m lilac.triangles                 # best triangles overall
+python -m lilac.triangles tarragon        # triangles built around one ingredient
+python -m lilac.triangles --magical       # strict: 3 note families + 3 categories
+```
+
+```
+soursop + plum_wine + rhubarb
+   soursop–plum_wine via ester (fruity);  plum_wine–rhubarb via ether (oxygenated);
+   rhubarb–soursop via methoxy (phenolic)          # a closed loop of three different notes
+```
+
+The edge bar self-calibrates: anchored on a weakly-bridged hub (roasted cocoa, whose
+bridges are all one family) it still surfaces that ingredient's best triangles rather
+than freezing it out.
+
 ### Molecule inspector (HTML app)
 
 ```bash
@@ -276,6 +301,7 @@ src/lilac/
   validate.py     # kNN odor prediction + Morgan baseline + sanity checks
   pairing.py      # bit-level pairing: reinforce / bridge / contrast + CLI
   shared.py       # compound-level pairing: the actual molecules two foods share + CLI
+  triangles.py    # closed A–B–C bridge cycles (three-way complements) + CLI
   ingredients.py  # 595 real ingredients as superimposed mixtures + IDF pairing CLI
   compose.py      # build a dish: coherence-led ensemble + surprise + hedonic warnings
 scripts/          # thin CLI entry points for the steps above
