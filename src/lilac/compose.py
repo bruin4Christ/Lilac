@@ -38,7 +38,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from .sensors import BIT_NAMES
+from .sensors import _COMPOSITION, BIT_NAMES
 from .signatures import FlavorSignature
 
 # ---------------------------------------------------------------------------
@@ -71,10 +71,15 @@ _PHYSICOCHEMICAL = {
     "hbond_donor", "hbond_acceptors", "aromatic_rich", "multi_ring", "has_stereocenter",
 }
 
+# The composition bits (counts / atom budget / chain length) sharpen the *code* for
+# reconstruction, but "bridges via carbon_5_7" is not a meaningful aroma link, so
+# they are likewise excluded from the characterful sensors compose scores on.
+_COMPOSITION_BITS = {name for name, _ in _COMPOSITION}
+
 
 def _character_mask() -> np.ndarray:
     """1.0 for smell-carrying (structural/scaffold/topology) sensors, else 0.0."""
-    drop = _PHYSICOCHEMICAL | _UNINFORMATIVE
+    drop = _PHYSICOCHEMICAL | _COMPOSITION_BITS | _UNINFORMATIVE
     return np.array([0.0 if b in drop else 1.0 for b in BIT_NAMES])
 
 

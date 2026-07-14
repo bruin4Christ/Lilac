@@ -17,9 +17,35 @@ def test_bit_count_and_names_unique():
     # Panel-agnostic: the count is whatever the sensor tables define (it grows over
     # time), but the structural invariants must always hold.
     assert N_BITS == len(BIT_NAMES)
-    assert N_BITS >= 56                    # the panel only grows; never silently shrink
+    assert N_BITS >= 72                    # the panel only grows; never silently shrink
     assert len(set(BIT_NAMES)) == N_BITS   # no duplicate sensor names
     assert set(LARGE_STRUCTURE_BITS).issubset(set(BIT_NAMES))
+
+
+@pytest.mark.parametrize(
+    "name, smiles, expected",
+    [
+        # graded chain length on the longest carbon run
+        ("ethyl acetate",  "CCOC(=O)C",       {"chain_c2_3", "carbon_le4"}),
+        ("isoamyl acetate", "CC(C)CCOC(=O)C", {"chain_c4_5", "methyl_3plus", "carbon_5_7"}),
+        ("n-hexyl acetate", "CCCCCCOC(=O)C",  {"chain_c6_9", "carbon_8_11"}),
+        ("glycerol",        "OCC(O)CO",       {"hydroxyl_2plus", "oxygen_3plus"}),
+        ("caffeine",        "Cn1cnc2c1c(=O)n(C)c(=O)n2C", {"nitrogen_2plus"}),
+    ],
+)
+def test_composition_sensors(name, smiles, expected):
+    on = set(active_names(encode(smiles)))
+    missing = expected - on
+    assert not missing, f"{name}: composition sensors not on: {missing} (got {on})"
+
+
+def test_composition_separates_the_fruit_ester_series():
+    # The original motivation: chain length / branching must give isoamyl acetate,
+    # n-amyl acetate, and ethyl acetate three *distinct* codes.
+    codes = {n: encode(s).tobytes() for n, s in [
+        ("isoamyl", "CC(C)CCOC(=O)C"), ("n-amyl", "CCCCCOC(=O)C"),
+        ("ethyl", "CCOC(=O)C")]}
+    assert len(set(codes.values())) == 3
 
 
 def test_unparseable_smiles_returns_none():

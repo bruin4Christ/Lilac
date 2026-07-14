@@ -24,6 +24,7 @@ from lilac.compose import compose  # noqa: E402
 from lilac.data import load_flavor_network  # noqa: E402
 from lilac.ingredients import build_ingredient_signatures, idf_weights  # noqa: E402
 from lilac.sensors import (  # noqa: E402
+    _COMPOSITION,
     _DESCRIPTOR,
     _LARGE_STRUCTURAL,
     _LARGE_TOPO,
@@ -43,7 +44,8 @@ PRESETS = {
 
 
 def _sensor_groups() -> list[int]:
-    sizes = [len(_STRUCTURAL), len(_LARGE_STRUCTURAL), len(_DESCRIPTOR), len(_LARGE_TOPO)]
+    sizes = [len(_STRUCTURAL), len(_LARGE_STRUCTURAL), len(_DESCRIPTOR),
+             len(_LARGE_TOPO), len(_COMPOSITION)]
     return [g for g, n in enumerate(sizes) for _ in range(n)]
 
 
@@ -100,7 +102,7 @@ TEMPLATE = r"""<style>
   --text:#1B1726; --muted:#6C6482; --accent:#7C5CF0; --accent-soft:#EEE9FE;
   --base:#7C5CF0; --reinforce:#2E9E6B; --bridge:#C0851C; --accent3:#5670D6;
   --warn:#C2410C; --track:#EDE9F8;
-  --g0:#7C5CF0; --g1:#1FA8A0; --g2:#5670D6; --g3:#C0851C;
+  --g0:#7C5CF0; --g1:#1FA8A0; --g2:#5670D6; --g3:#C0851C; --g4:#C2568F;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
 }
@@ -109,21 +111,21 @@ TEMPLATE = r"""<style>
   --text:#ECE7F7; --muted:#9A93AE; --accent:#A78BFF; --accent-soft:#241C3A;
   --base:#A78BFF; --reinforce:#4FBD86; --bridge:#E0A63C; --accent3:#8AA0FF;
   --warn:#F0956A; --track:#26203440;
-  --g0:#A78BFF; --g1:#37C4BB; --g2:#8AA0FF; --g3:#E0A63C;
+  --g0:#A78BFF; --g1:#37C4BB; --g2:#8AA0FF; --g3:#E0A63C; --g4:#E58BB8;
 }}
 :root[data-theme="light"]{
   --bg:#FAF9FE; --surface:#FFFFFF; --surface-2:#F4F1FC; --border:#E7E2F4;
   --text:#1B1726; --muted:#6C6482; --accent:#7C5CF0; --accent-soft:#EEE9FE;
   --base:#7C5CF0; --reinforce:#2E9E6B; --bridge:#C0851C; --accent3:#5670D6;
   --warn:#C2410C; --track:#EDE9F8;
-  --g0:#7C5CF0; --g1:#1FA8A0; --g2:#5670D6; --g3:#C0851C;
+  --g0:#7C5CF0; --g1:#1FA8A0; --g2:#5670D6; --g3:#C0851C; --g4:#C2568F;
 }
 :root[data-theme="dark"]{
   --bg:#121019; --surface:#1A1624; --surface-2:#221C30; --border:#2E2740;
   --text:#ECE7F7; --muted:#9A93AE; --accent:#A78BFF; --accent-soft:#241C3A;
   --base:#A78BFF; --reinforce:#4FBD86; --bridge:#E0A63C; --accent3:#8AA0FF;
   --warn:#F0956A; --track:#26203440;
-  --g0:#A78BFF; --g1:#37C4BB; --g2:#8AA0FF; --g3:#E0A63C;
+  --g0:#A78BFF; --g1:#37C4BB; --g2:#8AA0FF; --g3:#E0A63C; --g4:#E58BB8;
 }
 *{box-sizing:border-box}
 body{background:var(--bg)}
@@ -187,7 +189,7 @@ body{background:var(--bg)}
 .adds{grid-column:2 / span 2;grid-row:3;display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
 .pill{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface-2);
   border:1px solid var(--border);border-radius:999px;padding:2px 8px}
-.pill.g0{color:var(--g0)} .pill.g1{color:var(--g1)} .pill.g2{color:var(--g2)} .pill.g3{color:var(--g3)}
+.pill.g0{color:var(--g0)} .pill.g1{color:var(--g1)} .pill.g2{color:var(--g2)} .pill.g3{color:var(--g3)} .pill.g4{color:var(--g4)}
 .warn{grid-column:1 / -1;grid-row:4;display:flex;gap:7px;align-items:baseline;margin-top:9px;
   font-size:12.5px;color:var(--warn);background:color-mix(in srgb,var(--warn) 10%,transparent);
   border-radius:8px;padding:6px 10px}
@@ -288,7 +290,7 @@ function memberHTML(rec){
   </div>`;
 }
 
-const GNAME = ["structural","scaffold","physicochem","topology"];
+const GNAME = ["structural","scaffold","physicochem","topology","composition"];
 function paletteHTML(pal){
   const cells = pal.map((v,b)=>{
     const op = v<=0 ? 0.06 : 0.12 + 0.88*v;

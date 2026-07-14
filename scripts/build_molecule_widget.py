@@ -20,6 +20,7 @@ import numpy as np  # noqa: E402
 
 from lilac.data import load_flavor_network, load_odorant_library  # noqa: E402
 from lilac.sensors import (  # noqa: E402
+    _COMPOSITION,
     _DESCRIPTOR,
     _LARGE_STRUCTURAL,
     _LARGE_TOPO,
@@ -93,15 +94,34 @@ DESCRIPTIONS: dict[str, str] = {
     "fused_ring_sys": "any shared-edge ring system",
     "polycyclic": "three or more rings",
     "large_scaffold": "a big molecule, 16+ heavy atoms",
+    # composition: counts, atom budget, chain length (toward an assemblable code)
+    "chain_c2_3": "longest carbon chain of 2–3",
+    "chain_c4_5": "longest carbon chain of 4–5",
+    "chain_c6_9": "longest carbon chain of 6–9",
+    "chain_c10plus": "longest carbon chain of 10+",
+    "methyl_2plus": "two or more methyl groups",
+    "methyl_3plus": "three or more methyl groups",
+    "hydroxyl_2plus": "two or more -OH groups (polyol)",
+    "ester_2plus": "two or more ester groups",
+    "carbon_le4": "4 or fewer carbons (small)",
+    "carbon_5_7": "5–7 carbons",
+    "carbon_8_11": "8–11 carbons",
+    "carbon_12plus": "12 or more carbons (large)",
+    "oxygen_2plus": "two or more oxygen atoms",
+    "oxygen_3plus": "three or more oxygen atoms",
+    "nitrogen_1plus": "at least one nitrogen atom",
+    "nitrogen_2plus": "two or more nitrogen atoms",
 }
 
 GROUP_NAMES = ["structural “corner” detectors", "larger scaffolds",
-               "physicochemical properties", "whole-molecule topology"]
+               "physicochemical properties", "whole-molecule topology",
+               "composition (counts, size, chain)"]
 
 
 def sensor_groups() -> list[int]:
-    """Group id per bit: 0 structural, 1 large-scaffold, 2 physicochemical, 3 topology."""
-    sizes = [len(_STRUCTURAL), len(_LARGE_STRUCTURAL), len(_DESCRIPTOR), len(_LARGE_TOPO)]
+    """Group id per bit: 0 structural, 1 scaffold, 2 physicochem, 3 topology, 4 composition."""
+    sizes = [len(_STRUCTURAL), len(_LARGE_STRUCTURAL), len(_DESCRIPTOR),
+             len(_LARGE_TOPO), len(_COMPOSITION)]
     groups = []
     for g, n in enumerate(sizes):
         groups += [g] * n
@@ -168,7 +188,7 @@ TEMPLATE = r"""<style>
   --bg:#FAF9FE; --surface:#FFFFFF; --surface-2:#F4F1FC; --border:#E7E2F4;
   --text:#1B1726; --muted:#6C6482; --accent:#7C5CF0; --accent-soft:#EEE9FE;
   --track:#E9E4F5; --on:#1B1726;
-  --g0:#7C5CF0; --g1:#1FA8A0; --g2:#5670D6; --g3:#C0851C;
+  --g0:#7C5CF0; --g1:#1FA8A0; --g2:#5670D6; --g3:#C0851C; --g4:#C2568F;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
 }
@@ -176,19 +196,19 @@ TEMPLATE = r"""<style>
   --bg:#121019; --surface:#1A1624; --surface-2:#221C30; --border:#2E2740;
   --text:#ECE7F7; --muted:#9A93AE; --accent:#A78BFF; --accent-soft:#241C3A;
   --track:#2A2338; --on:#ECE7F7;
-  --g0:#A78BFF; --g1:#37C4BB; --g2:#8AA0FF; --g3:#E0A63C;
+  --g0:#A78BFF; --g1:#37C4BB; --g2:#8AA0FF; --g3:#E0A63C; --g4:#E58BB8;
 }}
 :root[data-theme="light"]{
   --bg:#FAF9FE; --surface:#FFFFFF; --surface-2:#F4F1FC; --border:#E7E2F4;
   --text:#1B1726; --muted:#6C6482; --accent:#7C5CF0; --accent-soft:#EEE9FE;
   --track:#E9E4F5; --on:#1B1726;
-  --g0:#7C5CF0; --g1:#1FA8A0; --g2:#5670D6; --g3:#C0851C;
+  --g0:#7C5CF0; --g1:#1FA8A0; --g2:#5670D6; --g3:#C0851C; --g4:#C2568F;
 }
 :root[data-theme="dark"]{
   --bg:#121019; --surface:#1A1624; --surface-2:#221C30; --border:#2E2740;
   --text:#ECE7F7; --muted:#9A93AE; --accent:#A78BFF; --accent-soft:#241C3A;
   --track:#2A2338; --on:#ECE7F7;
-  --g0:#A78BFF; --g1:#37C4BB; --g2:#8AA0FF; --g3:#E0A63C;
+  --g0:#A78BFF; --g1:#37C4BB; --g2:#8AA0FF; --g3:#E0A63C; --g4:#E58BB8;
 }
 *{box-sizing:border-box}
 body{background:var(--bg)}

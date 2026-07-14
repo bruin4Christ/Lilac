@@ -1,12 +1,14 @@
 # Lilac — an interpretable olfactory map
 
-Model the nose as a fixed panel of **55 on/off sensors**. A molecule's structural
-"facets" (methyl, acetyl, ester, aromatic ring, sulfur, …) *and* its larger scaffolds
-(macrocyclic musk, coumarin, indole, terpenoid skeleton, …) switch on a *subset* of
-those sensors, so every molecule gets a compact **bit-code**. Aggregate the codes for
+Model the nose as a fixed panel of **72 on/off sensors**. A molecule's structural
+"facets" (methyl, acetyl, ester, aromatic ring, sulfur, …), its larger scaffolds
+(macrocyclic musk, coumarin, indole, terpenoid skeleton, …), *and* its coarse
+composition (carbon/oxygen count, chain length, how many methyls) switch on a *subset*
+of those sensors, so every molecule gets a compact **bit-code**. Aggregate the codes for
 all molecules that smell "lemon", and you get lemon's own signature — the compact
 "smell number" for a flavor. (The panel width is a design knob — it started at 40 and
-grew to 55 when a larger-structure tier was added; see below.)
+grew to 72 as new tiers were added: larger structures, then a composition tier that
+makes the code more *assemblable* back into a structure; see below.)
 
 ## Launch the apps
 
@@ -37,7 +39,7 @@ This is a small, deliberately *legible* take on real olfactory science:
 | Structural facets → bits | **Molecular fingerprints** (Morgan/ECFP) — bits mark substructures |
 | Each flavor → its own bit-signature | **Principal Odor Map** (Google/Osmo, *Science* 2023) — a learned map where odors are regions |
 
-The twist Lilac adds: the code is small (55 bits) and named enough that you can *read*
+The twist Lilac adds: the code is compact (72 bits) and named enough that you can *read*
 it — every bit has a name and a reason.
 
 ## What it does
@@ -47,9 +49,9 @@ it — every bit has a name and a reason.
    library** unioned across six pyrfume archives (GoodScents, Leffingwell, IFRA, Sigma,
    AromaDb, FlavorNet), all fetched from the public
    [pyrfume-data](https://github.com/pyrfume/pyrfume-data) archive.
-2. **Encodes each molecule** into a 55-bit code (`src/lilac/sensors.py`) — 29 SMARTS
-   "corner" detectors + 9 larger scaffolds + 11 physicochemical + 6 whole-molecule
-   topology sensors, all via RDKit.
+2. **Encodes each molecule** into a 72-bit code (`src/lilac/sensors.py`) — 29 SMARTS
+   "corner" detectors + 10 larger scaffolds + 11 physicochemical + 6 whole-molecule
+   topology + 16 composition (counts / atom budget / chain length) sensors, all via RDKit.
 3. **Builds per-flavor signatures** — the characteristic bit pattern of each odor.
 4. **Draws the map** — a 2-D layout of all molecules, coloured by odor family.
 5. **Validates** — held-out odor prediction (vs. a 2048-bit Morgan baseline) and a
@@ -59,11 +61,11 @@ it — every bit has a name and a reason.
 
 ```
 Held-out odor prediction (5-NN):        micro-F1   macro-F1
-  55-bit nose                             0.393      0.235   <- beats baseline on macro-F1
-  Morgan-2048  (51x more bits, opaque)    0.403      0.227
+  72-bit nose                             0.397      0.235   <- beats baseline on macro-F1
+  Morgan-2048  (28x more bits, opaque)    0.403      0.227
 ```
 
-The compact, human-readable 55-bit code lands within ~1 micro-F1 point of a full
+The compact, human-readable 72-bit code lands within ~1 micro-F1 point of a full
 2048-bit fingerprint — and *ahead* of it on macro-F1, where the larger-structure
 sensors (indole→jasmine, coumarin→hay) help the rare odor classes. Legibility is
 nearly free.
@@ -232,17 +234,17 @@ python scripts/build_molecule_widget.py    # -> outputs/lilac_molecules.html
 ```
 
 The other side of the coin: pick a raw ingredient and see the **molecules inside it**,
-each rendered as its 55-bit sensor signature (a colour-coded strip + hex) with its SMILES,
+each rendered as its 72-bit sensor signature (a colour-coded strip + hex) with its SMILES,
 plus the ingredient's **superimposed signature** — each sensor shaded by the fraction of
-its molecules that fire it. The 55 sensors are colour-grouped (structural / large scaffold
-/ physicochemical / topology). Click a molecule to name its active sensors, or open the
-built-in **Bit index** for a plain-English gloss of what all 55 sensors detect.
+its molecules that fire it. The 72 sensors are colour-grouped (structural / large scaffold
+/ physicochemical / topology / composition). Click a molecule to name its active sensors, or open the
+built-in **Bit index** for a plain-English gloss of what all 72 sensors detect.
 
 ## Layout
 
 ```
 src/lilac/
-  sensors.py      # THE CORE: encode(smiles) -> uint8[55] + named bit table
+  sensors.py      # THE CORE: encode(smiles) -> uint8[72] + named bit table
   data.py         # fetch the Leffingwell set + union the 6.3k odorant library
   signatures.py   # per-flavor signatures (soft + crisp); bespoke from SMILES
   similarity.py   # hamming / jaccard / cosine, nearest-neighbour lookup
@@ -255,7 +257,7 @@ scripts/          # thin CLI entry points for the steps above
 tests/            # known molecules light up the expected sensors
 ```
 
-## The 55 sensors
+## The 72 sensors
 
 29 **structural "corners"** (SMARTS): hydroxyl, primary alcohol, phenol, carboxylic
 acid, ester, lactone, aldehyde, ketone, ether, acetal, methyl, gem-dimethyl, benzene
@@ -263,9 +265,9 @@ ring, fused aromatic, aliphatic ring, alkene, conjugated diene, terpene/isoprene
 **sulfur**, pyrazine, furan, halogen, acetyl, methoxy, methoxy-phenol, aromatic-N, long
 alkyl chain, branched chain.
 
-9 **larger scaffolds** (SMARTS): indole (jasmine/animalic), coumarin (hay/tonka),
+10 **larger scaffolds** (SMARTS): indole (jasmine/animalic), coumarin (hay/tonka),
 benzofuran, quinoline (leathery), thiazole (roasted), thiophene, decalin (woody/ambery),
-oxane ring, polyene.
+oxane ring, polyene, **phthalide** (celery/lovage/angelica).
 
 11 **physicochemical** (RDKit descriptors): MW low/high, logP low/high, high TPSA,
 flexible, H-bond donor, ≥3 H-bond acceptors, aromatic-rich, multi-ring, has stereocenter.
@@ -275,6 +277,14 @@ multi-isoprene (terpenoid skeleton), fused-ring system, polycyclic, large scaffo
 These read the molecule at a scale no local "corner" can — e.g. muscone (a 15-membered
 macrocyclic musk) now trips `macrocycle`, where before it was indistinguishable from a
 small ketone.
+
+16 **composition** (counts / atom budget / chain length): graded longest-carbon-chain
+(C2–3 / C4–5 / C6–9 / C10+), group counts (≥2 or ≥3 methyls, ≥2 hydroxyls, ≥2 esters),
+carbon budget (≤4 / 5–7 / 8–11 / 12+), and heteroatom budget (≥2/≥3 oxygens, ≥1/≥2
+nitrogens). Where the bits above ask *"which motifs are present?"*, these ask *"how many,
+and how big?"* — so the code carries a coarse molecular formula and starts to be
+*assemblable* back into a structure. Concretely, this is what finally separates the
+fruit-ester series (ethyl → isoamyl → n-hexyl acetate), which shared one code before.
 
 The panel is a starting point, not frozen — it's meant to be tuned against the sanity
 checks in `validate.py`.
