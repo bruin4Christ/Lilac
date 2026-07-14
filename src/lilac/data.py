@@ -174,11 +174,40 @@ def _fetch_flavornet(filename: str) -> Path:
     return dest
 
 
+# Greek position prefixes, spelled and single-letter/unicode, collapsed to one form
+# so the library's "delta-decalactone" matches the Flavor-Network's "d-decalactone"
+# (and gamma/alpha/beta likewise). Crucially this keeps gamma vs delta *distinct*
+# (g vs d) -- gamma- and delta-lactones are different molecules with different smells.
+_GREEK = {"alpha": "a", "beta": "b", "gamma": "g", "delta": "d", "epsilon": "e",
+          "α": "a", "β": "b", "γ": "g", "δ": "d", "ε": "e"}
+
+# A few common aroma synonyms the token normaliser can't bridge (naming convention
+# differs, not just a prefix). Kept small and exact so it can't mis-map.
+_SYNONYMS = {
+    "phenethyl alcohol": "2-phenylethanol",
+    "hexyl alcohol": "1-hexanol",
+    "amyl alcohol": "1-pentanol",
+    "isoamyl alcohol": "3-methyl-1-butanol",
+    "benzyl carbinol": "2-phenylethanol",
+}
+
+
 def _norm_name(s: str) -> str:
-    """Loose normalisation for matching compound names across sources."""
-    s = str(s).lower().strip()
+    """Loose normalisation for matching compound names across sources.
+
+    Beyond stripping parentheticals and non-alphanumerics, it maps greek position
+    prefixes to a single letter (so ``d-decalactone`` == ``delta-decalactone``) and
+    drops a leading ``n-`` (normal-), so ``n-nonanal`` == ``nonanal``.
+    """
+    s = str(s).lower().strip().replace("_", " ")  # Flavor-Network names use underscores
+    if s in _SYNONYMS:                            # exact-match curated synonyms first
+        s = _SYNONYMS[s]
     s = re.sub(r"\(.*?\)", "", s)                 # drop parenthetical stereo/notes
-    s = s.replace("alpha", "a").replace("beta", "b").replace("gamma", "g")
+    # leading normal- prefix (n-nonanal -> nonanal), but NOT N-methyl / N-ethyl,
+    # where the "n-" marks nitrogen substitution and names a different molecule.
+    s = re.sub(r"^n-(?!methyl|ethyl)", "", s)
+    for word, letter in _GREEK.items():
+        s = s.replace(word, letter)
     return re.sub(r"[^a-z0-9]", "", s)            # keep alnum only
 
 
@@ -195,7 +224,9 @@ def load_flavor_network(min_compounds: int = 3, cache: bool = True) -> pd.DataFr
     ingredients retain a representative profile. There are no concentrations, so a
     signature weights every compound equally -- a known simplification.
     """
-    cache_path = _DATA_DIR / f"flavor_network_min{min_compounds}.pkl"
+    # The cache key carries a resolver version so improvements to name-matching
+    # (which change which compounds resolve) invalidate stale pickles automatically.
+    cache_path = _DATA_DIR / f"flavor_network_min{min_compounds}_v2.pkl"
     if cache and cache_path.exists():
         return pd.read_pickle(cache_path)
 

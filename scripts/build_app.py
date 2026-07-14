@@ -229,7 +229,7 @@ body{background:var(--bg)}
       <div id="list-c"></div></div>
   </div>
 
-  <p class="foot">Aroma-only hypotheses from ~590 ingredients (Ahn <em>et al.</em> Flavor
+  <p class="foot">Aroma-only hypotheses from ~595 ingredients (Ahn <em>et al.</em> Flavor
     Network × Lilac sensors). Compounds are weighted equally (no concentrations), so read
     these as leads, not verdicts — taste, texture and culture decide the plate. Click any
     ingredient to re-center; <code>🎲</code> jumps somewhere random.</p>

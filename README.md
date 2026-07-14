@@ -121,14 +121,14 @@ label. Build your own with `signatures.signature_from_smiles(name, smiles, weigh
 
 A real ingredient isn't one molecule — it's a *mixture*, so its signature is the
 **superposition** of its constituent volatiles on the sensor panel (per bit, the
-fraction of the ingredient's compounds that fire it). Lilac builds **590 ingredients**
+fraction of the ingredient's compounds that fire it). Lilac builds **595 ingredients**
 from the [Ahn et al. *Flavor Network*](https://www.nature.com/articles/srep00196)
 ingredient–compound data, mapping each compound to a structure via the odorant library
-(~65% of compounds resolve; the matched ones are the common aroma molecules).
+(~66% of compounds resolve by name — greek-prefix (δ-/γ-), n- and synonym matching recover the rest, including the δ-lactones that give coconut its character).
 
 ```bash
 python scripts/build_ingredients.py                     # -> outputs/ingredient_signatures.csv
-python -m lilac.ingredients blueberry --mode all        # pair one ingredient vs the other 589
+python -m lilac.ingredients blueberry --mode all        # pair one ingredient vs the other 594
 python -m lilac.ingredients coffee   --mode reinforce   # coffee ~ cocoa, roasted peanut, beef
 python -m lilac.ingredients garlic   --mode contrast --no-idf
 ```
@@ -211,8 +211,10 @@ The composition layer made clickable: pick a base and a full **dish** appears �
 partner as a card showing its role (reinforce / bridge / accent), the distinctive sensor
 it bridges on, the new notes it brings, any culinary-category leap, and a ⚠ hedonic
 caution (never a filter). A **Harmonious ↔ Adventurous** toggle dials how far the dish
-reaches, and a **dish palette** strip shows the combined signature across all sensors.
-Click any partner to grow a new dish from it. All 590 ingredients' dishes are precomputed
+reaches, a **Balanced ↔ Character** toggle chooses uniform vs distinctive-compound weighting
+(the latter rescues trace-character foods like coconut), and a **dish palette** strip shows
+the combined signature across all sensors.
+Click any partner to grow a new dish from it. All 595 ingredients' dishes are precomputed
 and embedded.
 
 ### Pairing explorer (HTML app)
@@ -225,7 +227,7 @@ Generates a single static page: pick a base ingredient and its **reinforce / bri
 contrast** lists appear side by side, each row showing the partner's category, an
 IDF-weighted similarity meter, and the distinctive sensor that bridges the two
 ("garlic ~ chive *via sulfur*"). Click any partner to re-center; 🎲 jumps at random. No
-external requests — all 590 ingredients' pairings are precomputed and embedded.
+external requests — all 595 ingredients' pairings are precomputed and embedded.
 
 ### Molecule inspector (HTML app)
 
@@ -251,7 +253,7 @@ src/lilac/
   mapviz.py       # 2-D map (UMAP -> t-SNE -> PCA fallback)
   validate.py     # kNN odor prediction + Morgan baseline + sanity checks
   pairing.py      # flavor pairing: reinforce / bridge / contrast + CLI
-  ingredients.py  # 590 real ingredients as superimposed mixtures + IDF pairing CLI
+  ingredients.py  # 595 real ingredients as superimposed mixtures + IDF pairing CLI
   compose.py      # build a dish: coherence-led ensemble + surprise + hedonic warnings
 scripts/          # thin CLI entry points for the steps above
 tests/            # known molecules light up the expected sensors

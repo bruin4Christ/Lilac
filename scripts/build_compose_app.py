@@ -36,11 +36,16 @@ from lilac.sensors import (  # noqa: E402
 SIZE = 5  # ingredients per dish (base included)
 _ROLE = {"base": 0, "reinforce": 1, "bridge": 2, "accent": 3}
 
-# The two presets the UI toggles between: (surprise, novelty, diversity).
+# The two "adventurousness" presets the UI toggles between: (surprise, novelty, diversity).
 PRESETS = {
     "h": dict(surprise_weight=0.25, novelty_weight=0.30, diversity_weight=0.50),
     "a": dict(surprise_weight=0.70, novelty_weight=0.60, diversity_weight=0.60),
 }
+
+# The two compound-weighting modes: uniform (every compound equal) vs specificity
+# (up-weight distinctive compounds), which rescues ingredients whose character lives
+# in trace notes -- e.g. coconut's lactones. Keys: "u" and "s".
+WEIGHTINGS = {"u": "uniform", "s": "specificity"}
 
 
 def _sensor_groups() -> list[int]:
@@ -60,25 +65,33 @@ def _pack_member(m, idx_of) -> list:
 
 def build_data() -> dict:
     df = load_flavor_network(min_compounds=5)
-    sigs = build_ingredient_signatures(df=df)
-    names = list(sigs)
+    names = list(build_ingredient_signatures(df=df))   # ingredient set is weighting-independent
     idx_of = {n: i for i, n in enumerate(names)}
     cats = dict(zip(df["ingredient"], df["category"]))
-    idf = idf_weights(sigs)
 
-    dishes: dict[str, list] = {"h": [], "a": []}
-    for key, params in PRESETS.items():
-        for n in names:
-            comp = compose(n, sigs, idf, categories=cats, size=SIZE, **params)
-            dishes[key].append({
-                "m": [_pack_member(m, idx_of) for m in comp.members],
-                "p": [round(float(v), 2) for v in comp.palette],
-            })
+    # dishes[weighting][preset] -> per-base {members, palette}
+    dishes: dict[str, dict[str, list]] = {}
+    ncomp = None
+    for wkey, wname in WEIGHTINGS.items():
+        sigs = build_ingredient_signatures(df=df, weighting=wname)
+        idf = idf_weights(sigs)
+        if ncomp is None:
+            ncomp = [int(sigs[n].n_molecules) for n in names]
+        dishes[wkey] = {}
+        for pkey, params in PRESETS.items():
+            row = []
+            for n in names:
+                comp = compose(n, sigs, idf, categories=cats, size=SIZE, **params)
+                row.append({
+                    "m": [_pack_member(m, idx_of) for m in comp.members],
+                    "p": [round(float(v), 2) for v in comp.palette],
+                })
+            dishes[wkey][pkey] = row
 
     return {
         "names": names,
         "cats": [cats[n] for n in names],
-        "ncomp": [int(sigs[n].n_molecules) for n in names],
+        "ncomp": ncomp,
         "sensors": BIT_NAMES,
         "groups": _sensor_groups(),
         "dishes": dishes,
@@ -233,6 +246,10 @@ body{background:var(--bg)}
       <button id="mode-h" class="on" type="button">Harmonious</button>
       <button id="mode-a" type="button">Adventurous</button>
     </div>
+    <div class="seg" role="tablist" aria-label="Compound weighting">
+      <button id="wt-u" class="on" type="button" title="Every compound weighted equally">Balanced</button>
+      <button id="wt-s" type="button" title="Up-weight distinctive compounds — rescues trace-character ingredients like coconut">Character</button>
+    </div>
     <button class="btn" id="rand" type="button">🎲</button>
     <button class="btn" id="theme" type="button" aria-label="Toggle theme">◑</button>
   </div>
@@ -242,8 +259,11 @@ body{background:var(--bg)}
   <p class="foot">A dish is grown greedily: each pick maximizes coherence with the palette
     so far, plus a bit of novelty and a bonus for a surprising cross-category bridge, minus a
     redundancy penalty so it spans the palette instead of repeating itself. <b>Harmonious</b>
-    stays close; <b>Adventurous</b> reaches further. The ⚠ flag is a caution, never a veto —
-    bold notes belong in bold dishes. Aroma-only leads from ~590 ingredients; taste, texture
+    stays close; <b>Adventurous</b> reaches further. <b>Balanced</b> weights every compound
+    equally; <b>Character</b> up-weights an ingredient's distinctive compounds (rescuing
+    trace-character foods like coconut, whose creamy lactones are otherwise drowned out).
+    The ⚠ flag is a caution, never a veto —
+    bold notes belong in bold dishes. Aroma-only leads from ~595 ingredients; taste, texture
     and culture decide the plate. Click any partner to grow a new dish from it.</p>
 </div>
 
@@ -253,7 +273,7 @@ const {names, cats, ncomp, sensors, groups, dishes} = DATA;
 const el = id => document.getElementById(id);
 const cap = s => s.replace(/_/g," ");
 const ROLE = ["base","reinforce","bridge","accent"];
-let mode = "h", cur = 0;
+let preset = "h", weight = "u", cur = 0;
 
 el("theme").onclick = () => {
   const root = document.documentElement;
@@ -308,7 +328,7 @@ function paletteHTML(pal){
 
 function render(i){
   cur = i;
-  const d = dishes[mode][i];
+  const d = dishes[weight][preset][i];
   el("dish").innerHTML = d.m.map(memberHTML).join("") + paletteHTML(d.p);
   el("q").value = cap(names[i]);
   history.replaceState(null,"","#"+encodeURIComponent(names[i]));
@@ -322,14 +342,22 @@ function go(i){
   requestAnimationFrame(()=>el("dish").classList.remove("fade"));
   window.scrollTo({top:0,behavior:"smooth"});
 }
-function setMode(m){
-  mode = m;
+function setPreset(m){
+  preset = m;
   el("mode-h").classList.toggle("on", m==="h");
   el("mode-a").classList.toggle("on", m==="a");
   render(cur);
 }
-el("mode-h").onclick = ()=>setMode("h");
-el("mode-a").onclick = ()=>setMode("a");
+function setWeight(w){
+  weight = w;
+  el("wt-u").classList.toggle("on", w==="u");
+  el("wt-s").classList.toggle("on", w==="s");
+  render(cur);
+}
+el("mode-h").onclick = ()=>setPreset("h");
+el("mode-a").onclick = ()=>setPreset("a");
+el("wt-u").onclick = ()=>setWeight("u");
+el("wt-s").onclick = ()=>setWeight("s");
 
 // combobox
 const menu = el("menu"), q = el("q");

@@ -106,7 +106,7 @@ body{background:var(--bg)}
   </div>
 
   <p class="foot">All three pages are self-contained and precomputed from
-    <code>lilac.sensors</code> over ~590 ingredients (Ahn <em>et al.</em> Flavor Network).
+    <code>lilac.sensors</code> over ~595 ingredients (Ahn <em>et al.</em> Flavor Network).
     Aroma-only hypotheses — read them as leads, not verdicts.</p>
 </div>
 
