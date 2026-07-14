@@ -251,6 +251,29 @@ cocoa ~ roasted_peanut, roasted_filbert, coffee, soybean   (the roasted / Mailla
 cocoa ∩ hazelnut: 6,7-dihydro-2,3-dimethyl-5H-cyclopentapyrazine, 2-phenylethanol, …
 ```
 
+## Anchor + Lift (pairing, reverse-engineered from the canon)
+
+Ranking partners by *overlap* (reinforce / bridge / contrast) turns out not to
+predict classic pairings — across a set of timeless pairs, overlap sits at chance.
+What *is* consistent is a two-part structure `lilac.affinity` models directly:
+
+- **anchor** — the strongest distinctive note two ingredients share (common ground).
+- **lift** — the strongest distinctive note *one brings that the other lacks* (what it
+  adds). A lift is scored for **consonance** (does it belong with this base — garlic's
+  sulfur completes beef but wrecks a custard) and **register-novelty** (does it cross to
+  a new register or just deepen the base's own).
+
+A **deepener** is mostly anchor (strawberry+vanilla); a **lifter** is a big consonant
+lift (tarragon lifting chicken). A dish wants one of each around a base — exactly the
+tomato-deepens / tarragon-lifts structure. Validated against the canon: classic contrast
+pairs land at the **88th percentile** of the lifter ranking.
+
+```bash
+python -m lilac.affinity beef --mode deepener   # partners that deepen it
+python -m lilac.affinity beef --mode lifter      # partners that lift it (consonantly)
+python -m lilac.affinity beef --mode dish         # a deepener + a lifter around it
+```
+
 ## Flavor triangles
 
 A pairing is an edge; `lilac.triangles` finds closed **A–B–C bridge cycles** — three
@@ -312,6 +335,7 @@ src/lilac/
   validate.py     # kNN odor prediction + Morgan baseline + sanity checks
   pairing.py      # bit-level pairing: reinforce / bridge / contrast + CLI
   shared.py       # compound-level pairing: the actual molecules two foods share + CLI
+  affinity.py     # anchor + lift + consonance pairing (deepeners / lifters / dishes) + CLI
   triangles.py    # closed A–B–C bridge cycles (three-way complements) + CLI
   ingredients.py  # 595 real ingredients as superimposed mixtures + IDF pairing CLI
   compose.py      # build a dish: coherence-led ensemble + surprise + hedonic warnings
