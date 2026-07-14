@@ -141,27 +141,28 @@ body{background:var(--bg)}
 .slot .why{font-size:13px;color:var(--muted)}
 .slot .why b{color:var(--text)}
 
-.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 @media (max-width:760px){.cols{grid-template-columns:1fr}}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
 .card h2{font-size:15px;margin:0;padding:14px 16px 3px;display:flex;align-items:center;gap:8px}
 .dot{width:9px;height:9px;border-radius:50%}
 .card.deepc h2 .dot{background:var(--deep)} .card.liftc h2 .dot{background:var(--lift)}
 .card .rule{padding:0 16px 12px;color:var(--muted);font-size:12.5px;border-bottom:1px solid var(--border)}
-.row{display:grid;grid-template-columns:20px 1fr auto;gap:5px 10px;align-items:center;padding:9px 16px;border-bottom:1px solid var(--border)}
+.row{padding:10px 16px;border-bottom:1px solid var(--border)}
 .row:last-child{border-bottom:0}
-.rank{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right}
-.pname{grid-row:1;font-family:var(--mono);font-size:14px;color:var(--text);background:none;border:0;padding:0;
+.rtop{display:flex;align-items:baseline;gap:9px}
+.rank{flex:none;width:16px;text-align:right;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.pname{flex:1;min-width:0;font-family:var(--mono);font-size:14px;color:var(--text);background:none;border:0;padding:0;
   text-align:left;cursor:pointer;text-transform:capitalize;text-decoration:underline;text-decoration-color:var(--border);
-  text-underline-offset:2px;white-space:normal;overflow-wrap:anywhere}
+  text-underline-offset:2px;white-space:normal;overflow-wrap:break-word;line-height:1.3}
 .pname:hover{color:var(--accent);text-decoration-color:var(--accent)}
-.val{grid-row:1;font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right;white-space:nowrap}
-.sub{grid-column:2 / -1;display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-top:2px}
-.note{font-family:var(--mono);font-size:11.5px;padding:1px 7px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border)}
-.reg{font-size:11px;font-family:var(--mono);color:var(--lift)}
+.val{flex:none;font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap}
+.sub{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-top:4px;padding-left:25px}
+.note{font-family:var(--mono);font-size:11.5px;padding:1px 7px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);white-space:nowrap}
+.reg{font-size:11px;font-family:var(--mono);color:var(--lift);white-space:nowrap}
 .reg.deepens{color:var(--muted)}
-.cons{grid-column:2 / -1;display:flex;align-items:center;gap:6px;margin-top:5px;font-size:11px;color:var(--muted)}
-.cons .bar{flex:1;max-width:120px;height:4px;border-radius:3px;background:var(--track);overflow:hidden}
+.cons{display:flex;align-items:center;gap:6px;margin-top:5px;padding-left:25px;font-size:11px;color:var(--muted)}
+.cons .bar{flex:1;max-width:110px;height:4px;border-radius:3px;background:var(--track);overflow:hidden}
 .cons .bar i{display:block;height:100%}
 .cat{font-size:11px;color:var(--muted);font-family:var(--mono)}
 .foot{margin-top:26px;color:var(--muted);font-size:12.5px;max-width:82ch}
@@ -224,11 +225,13 @@ function deepRows(list){
   return list.map((p,k)=>{
     const [j,sn,st]=p;
     return `<div class="row">
-      <span class="rank">${k+1}</span>
-      <button class="pname" data-go="${j}">${cap(names[j])}</button>
-      <span class="val">${st.toFixed(2)}</span>
-      <span class="sub"><span class="cat">${cats[j]}</span>
-        <span class="note" style="color:${fcol(sn)}">shares ${sensors[sn]}</span></span>
+      <div class="rtop">
+        <span class="rank">${k+1}</span>
+        <button class="pname" data-go="${j}">${cap(names[j])}</button>
+        <span class="val">${st.toFixed(2)}</span>
+      </div>
+      <div class="sub"><span class="cat">${cats[j]}</span>
+        <span class="note" style="color:${fcol(sn)}">shares ${sensors[sn]}</span></div>
     </div>`;
   }).join("");
 }
@@ -238,12 +241,14 @@ function liftRows(list){
     const reg = crosses ? `<span class="reg">↗ new register</span>` : `<span class="reg deepens">deepens</span>`;
     const cc = cons>=0.66? "var(--lift)" : cons>=0.4? "var(--f1)" : "var(--warn)";
     return `<div class="row">
-      <span class="rank">${k+1}</span>
-      <button class="pname" data-go="${j}">${cap(names[j])}</button>
-      <span class="val">${lv.toFixed(2)}</span>
-      <span class="sub"><span class="cat">${cats[j]}</span>
-        <span class="note" style="color:${fcol(sn)}">adds ${sensors[sn]}</span>${reg}</span>
-      <span class="cons">consonance <span class="bar"><i style="width:${Math.round(cons*100)}%;background:${cc}"></i></span> ${cons.toFixed(2)}</span>
+      <div class="rtop">
+        <span class="rank">${k+1}</span>
+        <button class="pname" data-go="${j}">${cap(names[j])}</button>
+        <span class="val">${lv.toFixed(2)}</span>
+      </div>
+      <div class="sub"><span class="cat">${cats[j]}</span>
+        <span class="note" style="color:${fcol(sn)}">adds ${sensors[sn]}</span>${reg}</div>
+      <div class="cons">consonance <span class="bar"><i style="width:${Math.round(cons*100)}%;background:${cc}"></i></span> ${cons.toFixed(2)}</div>
     </div>`;
   }).join("");
 }
