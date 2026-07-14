@@ -158,6 +158,7 @@ def compose(
     size: int = 4,
     surprise_weight: float = 0.25,
     novelty_weight: float = 0.3,
+    diversity_weight: float = 0.5,
     challenge_weight: float = 0.0,
     challenge_flag: float = 0.35,
 ) -> Composition:
@@ -175,13 +176,21 @@ def compose(
     novelty_weight : weight on the (normalized) best new distinctive note. Kept
         secondary to coherence so picks stay base-specific rather than collapsing
         onto whichever ingredients happen to own the rarest sensors.
+    diversity_weight : discourage the dish from stacking *near-duplicate* picks --
+        adaptively and base-agnostically. Each candidate is penalized by its
+        similarity to the most-similar ingredient already on the plate (not to the
+        base). This fixes monotone dishes (olive → four near-identical fermented
+        fruits) while *preserving* a coherent single-theme dish whose partners are
+        mutually distinct (garlic → durian, grape brandy, boiled beef -- all allium,
+        none a duplicate of another). Set 0 to disable.
     challenge_weight : OPTIONAL down-nudge for polarizing picks. Default 0 -- the
         hedonic signal only warns and never eliminates. Raise it to gently reorder.
     challenge_flag : challenge score above which a (non-eliminating) warning shows.
 
     Each step scores candidates on **coherence** (char-weighted cosine to the
     palette so far -- the lead term, keeping the dish connected and base-specific),
-    plus a normalized **novelty** bonus and a **surprise** bonus, minus the optional
+    plus a normalized **novelty** bonus and a **surprise** bonus, minus a
+    **redundancy** penalty (similarity to the nearest existing pick) and the optional
     challenge nudge. A per-step coherence floor drops near-unrelated picks so a rare
     shared sensor alone can't drag in an incoherent ingredient.
     """
@@ -193,6 +202,9 @@ def compose(
     # IDF restricted to characterful sensors: distinctive substructures drive the
     # scoring, gross physicochemical descriptors do not.
     cw = idf * _CHAR_MASK
+
+    chosen_softs: list[np.ndarray] = []    # soft vectors of picks (excl. base), for
+                                           # the redundancy (near-duplicate) penalty
 
     base_sig = sigs[base]
     base_cat = categories.get(base, "")
@@ -227,9 +239,13 @@ def compose(
             coherence = _weighted_cosine(soft, covered, cw)       # 0..1, base-specific
             surprise = categories.get(n, "") != base_cat and base_cat != ""
             ch, _ = _challenge_score(soft)
-            cand.append({"n": n, "new": new_contrib, "shared": shared,
+            # Redundancy: closeness to the most-similar pick already on the plate
+            # (base excluded). High -> this candidate duplicates an existing pick.
+            redundancy = max((_weighted_cosine(soft, ps, cw) for ps in chosen_softs),
+                             default=0.0)
+            cand.append({"n": n, "new": new_contrib, "shared": shared, "soft": soft,
                          "novelty": novelty, "coherence": coherence,
-                         "surprise": surprise, "ch": ch})
+                         "surprise": surprise, "ch": ch, "redundancy": redundancy})
         if not cand:
             break
 
@@ -245,6 +261,7 @@ def compose(
             score = (c["coherence"]
                      + novelty_weight * (c["novelty"] / nmax)
                      + surprise_weight * c["surprise"]
+                     - diversity_weight * c["redundancy"]   # penalize near-duplicates
                      - challenge_weight * c["ch"])
             if score > best_score:
                 best_score, best = score, c
@@ -252,6 +269,7 @@ def compose(
         n, new_contrib, shared, surprise, ch = (
             best["n"], best["new"], best["shared"], best["surprise"], best["ch"])
         chosen.add(n)
+        chosen_softs.append(best["soft"])
         via = BIT_NAMES[int(np.argmax(shared))]
         adds = [BIT_NAMES[i] for i in np.argsort(-new_contrib)
                 if new_contrib[i] > 0 and BIT_NAMES[i] != via][:3]
@@ -283,6 +301,8 @@ def main() -> None:
                     help="bonus for cross-category bridging picks")
     ap.add_argument("--novelty", type=float, default=0.3, dest="novelty_weight",
                     help="weight on the best new distinctive note (secondary to coherence)")
+    ap.add_argument("--diversity", type=float, default=0.5, dest="diversity_weight",
+                    help="adaptive penalty for reusing a common bridge sensor (0 = off)")
     ap.add_argument("--challenge-weight", type=float, default=0.0,
                     help="OPTIONAL down-nudge for polarizing picks (0 = warn only, never rank)")
     ap.add_argument("--min-compounds", type=int, default=5)
@@ -301,6 +321,7 @@ def main() -> None:
     comp = compose(args.base, sigs, idf, categories=cats, size=args.size,
                    surprise_weight=args.surprise_weight,
                    novelty_weight=args.novelty_weight,
+                   diversity_weight=args.diversity_weight,
                    challenge_weight=args.challenge_weight)
     print()
     print(comp.describe())

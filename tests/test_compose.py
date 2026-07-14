@@ -54,6 +54,50 @@ def test_challenge_warning_fires_on_polarizing_ingredient():
     assert any(s in comp.members[0].warning for s in CHALLENGE_WEIGHTS)
 
 
+def test_diversity_prefers_distinct_over_near_duplicate():
+    # After the forced first pick P1, `twin` is ~identical to P1 (adds only a small
+    # extra note) while `fresh` is distinct. Diversity off takes the duplicate;
+    # diversity on takes the distinct partner -- the redundancy penalty at work.
+    df = pd.DataFrame({
+        "ingredient": ["base", "P1", "twin", "fresh"],
+        "smiles": [
+            ["CSC", "CCC=O"],                          # base: sulfur + aldehyde
+            ["CSC", "CCC=O", "Cc1cnccn1"],             # P1: + pyrazine (best first pick)
+            ["CSC", "CCC=O", "Cc1cnccn1", "CCCCCCCC"], # twin: P1 + a small extra note
+            ["CSC", "CCOC(=O)C"],                      # fresh: sulfur + ester (distinct)
+        ],
+    })
+    sigs = build_ingredient_signatures(df=df)
+    idf = idf_weights(sigs)
+    off = [m.ingredient for m in compose("base", sigs, idf, size=3,
+                                         diversity_weight=0.0).members]
+    on = [m.ingredient for m in compose("base", sigs, idf, size=3,
+                                        diversity_weight=1.0).members]
+    assert "twin" in off and "fresh" not in off      # duplicate taken without penalty
+    assert "fresh" in on and "twin" not in on        # distinct taken with penalty
+
+
+def test_diversity_preserves_a_coherent_distinct_theme():
+    # Three partners all bridging via the same rare note (pyrazine) but mutually
+    # distinct: the redundancy penalty must NOT disrupt this (garlic-via-sulfur case).
+    df = pd.DataFrame({
+        "ingredient": ["roast", "t_sulfur", "t_ester", "t_alkyl"],
+        "smiles": [
+            ["Cc1cnccn1", "CCC=O"],       # base: pyrazine + aldehyde
+            ["c1cnccn1", "CSC"],          # pyrazine + sulfur
+            ["c1cnccn1", "CCOC(=O)C"],    # pyrazine + ester
+            ["c1cnccn1", "CCCCCCCC"],     # pyrazine + long alkyl
+        ],
+    })
+    sigs = build_ingredient_signatures(df=df)
+    idf = idf_weights(sigs)
+    off = {m.ingredient for m in compose("roast", sigs, idf, size=4,
+                                         diversity_weight=0.0).members}
+    on = {m.ingredient for m in compose("roast", sigs, idf, size=4,
+                                        diversity_weight=1.0).members}
+    assert off == on   # a genuinely diverse theme is left intact
+
+
 def test_challenge_never_eliminates_the_only_coherent_pick():
     # Base bridges only to a sulfury (polarizing) partner; a huge challenge weight
     # must NOT filter it out -- the hedonic signal nudges ranking, never eliminates.

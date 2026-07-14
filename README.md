@@ -177,6 +177,12 @@ Each addition is scored on four interpretable, tunable forces:
 - **surprise** — a bonus for a bridging pick from a *different culinary category*
   (the food-pairing hypothesis: unexpected foods sharing a key aroma), e.g.
   beef → roasted shrimp *via pyrazine*.
+- **diversity** — an adaptive redundancy penalty (`--diversity`, default on): each
+  pick is docked for resembling an ingredient already on the plate, so a dish spans
+  the palette instead of stacking near-duplicates. It's *base-agnostic* — it breaks
+  up a monotone dish (olive's four fermented fruits) yet leaves a coherent
+  single-theme dish intact when its partners are mutually distinct (garlic → durian,
+  grape brandy, boiled beef — all allium, none a duplicate of another).
 - **challenge** — a *non-eliminating* hedonic flag. Ingredients leaning on
   polarizing notes (sulfur, amine, indole…) get a ⚠ warning, and *optionally* a
   gentle ranking nudge (`--challenge-weight`, default **0** = warn only). It never
