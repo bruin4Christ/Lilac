@@ -255,16 +255,27 @@ cocoa ∩ hazelnut: 6,7-dihydro-2,3-dimethyl-5H-cyclopentapyrazine, 2-phenyletha
 
 A pairing is an edge; `lilac.triangles` finds closed **A–B–C bridge cycles** — three
 ingredients where every pair bridges, and (the magic) each edge is carried by a
-*different* note family, so the trio spans three aromas at once instead of three shades
-of one. Results are ranked by note-family diversity, so the most complementary triangles
-come first; `--magical` hard-requires three distinct families across three culinary
-categories.
+*different* link. It works at **two levels**, mirroring the pairing lenses:
+
+- **bit** — each edge is the distinctive shared *sensor*; magical = three distinct
+  **note families** (terpene / sulfur / roasted / fruity / phenolic / oxygenated).
+- **molecular** — each edge is an actual shared *compound*; magical = three different
+  **molecules**, one per edge (the literal food-pairing hypothesis, closed into a loop).
 
 ```bash
-python -m lilac.triangles                 # best triangles overall
-python -m lilac.triangles tarragon        # triangles built around one ingredient
-python -m lilac.triangles --magical       # strict: 3 note families + 3 categories
+python -m lilac.triangles                    # best bit-level triangles
+python -m lilac.triangles --level molecular   # shared-compound triangles
+python -m lilac.triangles tarragon --magical  # strict, around one ingredient
 ```
+
+```
+bit:       soursop + plum_wine + rhubarb   (ester / ether / methoxy)
+molecular: peanut_butter + soybean + roasted_chicken
+             linked by butyl acetate, 9-octadecenal, 4-ethylbenzaldehyde — three real molecules
+```
+
+A **triangle explorer** app (`scripts/build_triangles_app.py`) draws each triangle as a
+little diagram, with a Sensor-bits ↔ Shared-molecules toggle; click a vertex to re-anchor.
 
 ```
 soursop + plum_wine + rhubarb

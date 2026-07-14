@@ -29,6 +29,7 @@ APPS = [
     ("build_hub.py", "index.html", "🏠 Hub"),
     ("build_compose_app.py", "lilac_compose.html", "🍽 Composition studio"),
     ("build_app.py", "lilac_pairings.html", "🌸 Pairing explorer"),
+    ("build_triangles_app.py", "lilac_triangles.html", "△ Triangle explorer"),
     ("build_molecule_widget.py", "lilac_molecules.html", "🔬 Molecule inspector"),
 ]
 
