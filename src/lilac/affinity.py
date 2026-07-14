@@ -99,8 +99,23 @@ def _base_family(base_soft: np.ndarray, cw: np.ndarray) -> str:
     return note_family(BIT_NAMES[int(np.argmax(base_soft * cw))])
 
 
+def _base_families(base_soft: np.ndarray, cw: np.ndarray, k: float = 0.35) -> set[str]:
+    """All note families the base fires strongly -- a base can live in several at once
+    (chocolate is roasted AND sweet), and a lift must not clash with ANY of them."""
+    v = base_soft * cw
+    mx = float(v.max()) or 1.0
+    fams = {note_family(BIT_NAMES[int(i)]) for i in np.argsort(-v)[:8] if v[i] >= k * mx}
+    return fams or {"other"}
+
+
 def analyze(base: str, partner: str, sigs: dict, idf: np.ndarray) -> Affinity:
-    """The anchor + lift (+ consonance) between a base and one partner."""
+    """The anchor + lift (+ consonance) between a base and one partner.
+
+    Consonance is the lift's *worst* fit across every register the base strongly
+    occupies -- a lift is only consonant if it clashes with none of them. (The
+    single-dominant-family version missed clashes like garlic's sulfur against
+    chocolate's *sweet* side, since chocolate reads as 'roasted' on its top note.)
+    """
     cw = idf * _CHAR_MASK
     a, b = sigs[base].soft, sigs[partner].soft
     shared = np.minimum(a, b) * cw                 # common distinctive notes
@@ -109,12 +124,13 @@ def analyze(base: str, partner: str, sigs: dict, idf: np.ndarray) -> Affinity:
     li = int(np.argmax(adds))
     lfam = note_family(BIT_NAMES[li])
     bfam = _base_family(a, cw)
+    con = min(consonance(lfam, bf) for bf in _base_families(a, cw))
     return Affinity(
         partner=partner,
         anchor_sensor=BIT_NAMES[ai], anchor_family=note_family(BIT_NAMES[ai]),
         anchor=float(shared[ai]),
         lift_sensor=BIT_NAMES[li], lift_family=lfam, lift=float(adds[li]),
-        consonance=consonance(lfam, bfam), base_family=bfam)
+        consonance=con, base_family=bfam)
 
 
 def rank(base: str, sigs: dict, idf: np.ndarray, mode: str = "deepener",
