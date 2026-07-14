@@ -1,0 +1,99 @@
+<style>
+:root{
+  --bg:#FAF9FE; --surface:#FFFFFF; --surface-2:#F4F1FC; --border:#E7E2F4;
+  --text:#1B1726; --muted:#6C6482; --accent:#7C5CF0; --accent-soft:#EEE9FE;
+  --compose:#7C5CF0; --pair:#2E9E6B; --inspect:#C0851C; --tri:#C2568F;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#121019; --surface:#1A1624; --surface-2:#221C30; --border:#2E2740;
+  --text:#ECE7F7; --muted:#9A93AE; --accent:#A78BFF; --accent-soft:#241C3A;
+  --compose:#A78BFF; --pair:#4FBD86; --inspect:#E0A63C; --tri:#E58BB8;
+}}
+:root[data-theme="light"]{
+  --bg:#FAF9FE; --surface:#FFFFFF; --surface-2:#F4F1FC; --border:#E7E2F4;
+  --text:#1B1726; --muted:#6C6482; --accent:#7C5CF0; --accent-soft:#EEE9FE;
+  --compose:#7C5CF0; --pair:#2E9E6B; --inspect:#C0851C; --tri:#C2568F;
+}
+:root[data-theme="dark"]{
+  --bg:#121019; --surface:#1A1624; --surface-2:#221C30; --border:#2E2740;
+  --text:#ECE7F7; --muted:#9A93AE; --accent:#A78BFF; --accent-soft:#241C3A;
+  --compose:#A78BFF; --pair:#4FBD86; --inspect:#E0A63C; --tri:#E58BB8;
+}
+*{box-sizing:border-box}
+body{background:var(--bg)}
+.wrap{max-width:760px;margin:0 auto;padding:56px 20px 72px;color:var(--text);
+  font-family:var(--sans);line-height:1.5}
+.top{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.logo{font-family:var(--mono);font-weight:700;font-size:30px;letter-spacing:-.02em;color:var(--accent)}
+.logo b{color:var(--text)}
+.theme{margin-left:auto;font-family:var(--sans);font-size:13px;font-weight:600;color:var(--muted);
+  background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:8px 12px;cursor:pointer}
+.theme:hover{color:var(--accent);border-color:var(--accent)}
+.lede{color:var(--muted);font-size:15.5px;max-width:60ch;margin:14px 0 34px}
+.lede b{color:var(--text);font-weight:600}
+.cards{display:flex;flex-direction:column;gap:14px}
+.card{display:flex;gap:18px;align-items:center;text-decoration:none;color:inherit;
+  background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px 22px;
+  transition:border-color .15s ease,transform .15s ease}
+.card:hover{transform:translateY(-2px)}
+.card.compose:hover{border-color:var(--compose)}
+.card.tri:hover{border-color:var(--tri)}
+.card.pair:hover{border-color:var(--pair)}
+.card.inspect:hover{border-color:var(--inspect)}
+.ico{font-size:30px;width:56px;height:56px;flex:none;display:grid;place-items:center;
+  background:var(--surface-2);border-radius:14px}
+.body h2{margin:0 0 4px;font-size:18px;letter-spacing:-.01em}
+.card.compose h2{color:var(--compose)} .card.pair h2{color:var(--pair)} .card.inspect h2{color:var(--inspect)} .card.tri h2{color:var(--tri)}
+.body p{margin:0;color:var(--muted);font-size:13.5px;max-width:56ch}
+.go{margin-left:auto;font-size:22px;color:var(--muted);flex:none}
+.card:hover .go{color:var(--text)}
+.foot{margin-top:34px;color:var(--muted);font-size:12.5px;max-width:64ch}
+.foot code{font-family:var(--mono);background:var(--surface-2);padding:1px 5px;border-radius:5px}
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div class="logo"><b>lilac</b> · olfactory studio</div>
+    <button class="theme" id="theme" type="button">◑ Theme</button>
+  </div>
+  <p class="lede">An interpretable map from <b>molecules → a named sensor "nose" → flavor</b>.
+    Four ways in: compose a dish, explore a pairing, find a triangle, or inspect the chemistry.</p>
+
+  <div class="cards">
+    <a class="card compose" href="lilac_compose.html">
+      <div class="ico">🍽</div>
+      <div class="body"><h2>Composition studio</h2><p>Grow a whole dish from one base — partners chosen to bridge and complement it across the sensor palette, each with its role, bridge note, and a Harmonious↔Adventurous dial.</p></div>
+      <div class="go" aria-hidden="true">→</div>
+    </a>
+    <a class="card pair" href="lilac_pairings.html">
+      <div class="ico">🌸</div>
+      <div class="body"><h2>Pairing explorer</h2><p>For any ingredient: what reinforces, bridges, or contrasts it by sensor bits — plus a fourth lens, the actual aroma molecules two foods literally share (the original food-pairing idea).</p></div>
+      <div class="go" aria-hidden="true">→</div>
+    </a>
+    <a class="card tri" href="lilac_triangles.html">
+      <div class="ico">△</div>
+      <div class="body"><h2>Triangle explorer</h2><p>Closed A–B–C loops where every pair bridges — the best ones bridge on three different notes. Two levels: shared sensors, or actual shared molecules.</p></div>
+      <div class="go" aria-hidden="true">→</div>
+    </a>
+    <a class="card inspect" href="lilac_molecules.html">
+      <div class="ico">🔬</div>
+      <div class="body"><h2>Molecule inspector</h2><p>Open an ingredient and read the molecules inside it — each rendered as its sensor signature, plus the ingredient's superimposed 'smell number' and a plain-English index of every bit.</p></div>
+      <div class="go" aria-hidden="true">→</div>
+    </a>
+  </div>
+
+  <p class="foot">All four pages are self-contained and precomputed from
+    <code>lilac.sensors</code> over ~595 ingredients (Ahn <em>et al.</em> Flavor Network).
+    Aroma-only hypotheses — read them as leads, not verdicts.</p>
+</div>
+
+<script>
+document.getElementById("theme").onclick = () => {
+  const r = document.documentElement;
+  const c = r.getAttribute("data-theme")
+    || (matchMedia("(prefers-color-scheme:dark)").matches ? "dark":"light");
+  r.setAttribute("data-theme", c==="dark"?"light":"dark");
+};
+</script>
