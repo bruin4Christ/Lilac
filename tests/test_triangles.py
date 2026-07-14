@@ -60,6 +60,30 @@ def test_anchor_restricts_membership():
     assert tris and all("a" in t.members for t in tris)
 
 
+def test_molecular_level_triangle():
+    # Three ingredients linked pairwise by three DIFFERENT shared compounds:
+    # A∩B = m_ab, B∩C = m_bc, C∩A = m_ca. D shares nothing.
+    df = pd.DataFrame({
+        "ingredient": ["a", "b", "c", "d"],
+        "category": ["cat1", "cat2", "cat3", "cat4"],
+        "smiles": [["m_ab", "m_ca", "fa"],
+                   ["m_ab", "m_bc", "fb"],
+                   ["m_bc", "m_ca", "fc"],
+                   ["fd1", "fd2", "fd3"]],
+    })
+    names = {"m_ab": "compound AB", "m_bc": "compound BC", "m_ca": "compound CA"}
+    tris = find_triangles(level="molecular", df=df,
+                          categories=dict(zip(df["ingredient"], df["category"])),
+                          compound_names=names, edge_min=0.01, max_similarity=0.99,
+                          min_families=1)
+    assert tris
+    top = tris[0]
+    assert set(top.members) == {"a", "b", "c"}
+    # each edge carried by a different molecule -> 3 distinct groups (the smiles)
+    assert top.families == {"m_ab", "m_bc", "m_ca"}
+    assert {e.via for e in top.edges} == {"compound AB", "compound BC", "compound CA"}
+
+
 def test_unknown_anchor_raises():
     sigs, idf, cats = _world()
     try:

@@ -1,21 +1,30 @@
-"""Flavor triangles -- closed A–B–C bridge cycles.
+"""Flavor triangles -- closed A–B–C bridge cycles, at two levels.
 
 A pairing is an edge; a *triangle* is three ingredients where every pair bridges,
-and -- the magic -- each edge is carried by a **different kind of note**: A meets B
-on one distinctive sensor, B meets C on another, C loops back to A on a third. The
-trio then spans three aroma families at once, a balanced little chord rather than
-three variations on one theme.
+and -- the magic -- each edge is carried by a **different kind of link**: A meets B
+one way, B meets C another, C loops back to A a third. The trio then spans three
+things at once, a balanced little chord rather than three variations on one theme.
 
-Two ingredients "bridge" on the distinctive (IDF-weighted) sensor they most share,
-exactly as in :mod:`lilac.compose`. An edge counts only if that bridge is strong
-(top-quantile) and the two ingredients aren't near-duplicates. A triangle is
-*magical* when its three bridge sensors fall in three different **note families**
-(terpene / sulfur / roasted / fruity / phenolic / oxygenated) and, by default, its
-three ingredients come from different culinary categories.
+Two levels, mirroring the pairing lenses:
 
-    python -m lilac.triangles                 # the best magical triangles overall
-    python -m lilac.triangles tarragon        # triangles built around one ingredient
-    python -m lilac.triangles --any-note       # drop the distinct-note-family rule
+* **bit** -- each edge is the distinctive (IDF-weighted) *sensor* the pair most
+  shares (as in :mod:`lilac.compose`); "different link" means a different **note
+  family** (terpene / sulfur / roasted / fruity / phenolic / oxygenated). This is
+  an abstraction of structure -- two foods can bridge without sharing a molecule.
+* **molecular** -- each edge is an actual *shared compound* (as in
+  :mod:`lilac.shared`), weighted by how distinctive that molecule is; "different
+  link" means a different **molecule** on each edge (not all three leaning on one
+  ubiquitous compound). This is the literal food-pairing hypothesis, closed into a
+  loop.
+
+Edges are kept only when strong (top-quantile) and between non-duplicate
+ingredients. Results are ranked by link diversity, so the most complementary
+triangles come first; a hard `min_families` / `min_categories` gives the strict
+"magical" version.
+
+    python -m lilac.triangles                       # best bit-level triangles
+    python -m lilac.triangles --level molecular      # shared-compound triangles
+    python -m lilac.triangles tarragon --magical     # strict, around one ingredient
 """
 
 from __future__ import annotations
@@ -28,8 +37,8 @@ import numpy as np
 from .compose import _CHAR_MASK
 from .sensors import BIT_NAMES
 
-# Which *kind* of note a bridge sensor carries. Distinct families across the three
-# edges is what makes a triangle a genuine three-way complement (not three terpenes).
+# Which *kind* of note a bridge sensor carries (bit level). Distinct families across
+# the three edges is what makes a triangle a genuine three-way complement.
 NOTE_FAMILIES: dict[str, str] = {}
 for _s in ("terpene_isoprene", "multi_isoprene", "alkene", "conjugated_diene",
            "gem_dimethyl", "aliphatic_ring", "polyene", "decalin", "oxane_ring"):
@@ -56,9 +65,18 @@ def note_family(sensor: str) -> str:
 class Edge:
     a: str
     b: str
-    sensor: str          # the distinctive sensor bridging the pair
-    family: str          # its note family
+    via: str             # what carries the link: a sensor name (bit) or compound name
+    group: str           # the distinctness key: note family (bit) or molecule (molecular)
     strength: float
+
+    # bit-level readers used `sensor`/`family`; keep them as aliases.
+    @property
+    def sensor(self) -> str:
+        return self.via
+
+    @property
+    def family(self) -> str:
+        return self.group
 
 
 @dataclass
@@ -66,73 +84,89 @@ class Triangle:
     members: tuple[str, str, str]
     edges: list[Edge]
     weakest: float                 # weakest of the three bridge strengths
-    families: set = field(default_factory=set)
+    families: set = field(default_factory=set)   # distinct link groups
     categories: set = field(default_factory=set)
 
     def describe(self) -> str:
-        head = " + ".join(self.members)
-        lines = [f"{head}"]
+        lines = [" + ".join(self.members)]
         for e in self.edges:
-            lines.append(f"    {e.a} – {e.b}  via {e.sensor} ({e.family})  [{e.strength:.2f}]")
+            lines.append(f"    {e.a} – {e.b}  via {e.via} ({e.group})  [{e.strength:.2f}]")
         return "\n".join(lines)
 
 
-def _bridge_matrices(soft: np.ndarray, cw: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """For every pair, the strongest shared characterful sensor and its strength."""
-    n = soft.shape[0]
+# ---------------------------------------------------------------------------
+# Edge providers: each returns (strength matrix, too_similar(i,j), edge_of(i,j)).
+# ---------------------------------------------------------------------------
+def _bit_edges(sigs, idf, max_similarity):
+    names = list(sigs)
+    soft = np.array([sigs[n].soft for n in names])
+    cw = idf * _CHAR_MASK
+    n = len(names)
     strength = np.zeros((n, n))
     bridge = np.zeros((n, n), dtype=int)
     for i in range(n):
-        m = np.minimum(soft[i], soft) * cw      # (n, N_BITS) shared, char-weighted
+        m = np.minimum(soft[i], soft) * cw
         strength[i] = m.max(axis=1)
         bridge[i] = m.argmax(axis=1)
     np.fill_diagonal(strength, 0.0)
-    return strength, bridge
-
-
-def find_triangles(
-    sigs: dict,
-    idf: np.ndarray,
-    categories: dict[str, str] | None = None,
-    anchor: str | None = None,
-    top: int = 12,
-    edge_percentile: float = 85.0,
-    edge_min: float | None = None,
-    max_similarity: float = 0.88,
-    min_families: int = 1,
-    min_categories: int = 1,
-) -> list[Triangle]:
-    """Find closed A–B–C bridge triangles.
-
-    Parameters
-    ----------
-    sigs, idf : ingredient signatures and per-sensor IDF (see `lilac.ingredients`).
-    categories : ingredient -> culinary category (for the category-diversity rule).
-    anchor : if given, only triangles containing this ingredient.
-    edge_percentile / edge_min : an edge exists when its bridge strength clears this
-        quantile of all bridge strengths (or the absolute `edge_min`, if given).
-    max_similarity : skip edges between near-duplicate ingredients (trivial cliques).
-    min_families : minimum distinct note families among the three bridges (1 = no
-        filter; 3 = fully "magical"). Results are always *ranked* by family diversity
-        regardless, so the most complementary triangles come first.
-    min_categories : minimum distinct culinary categories among the three ingredients.
-    """
-    categories = categories or {}
-    names = list(sigs)
-    idx = {n: i for i, n in enumerate(names)}
-    if anchor is not None and anchor not in idx:
-        raise KeyError(f"{anchor!r} is not a known ingredient")
-    soft = np.array([sigs[n].soft for n in names])
-    cw = idf * _CHAR_MASK
-
-    strength, bridge = _bridge_matrices(soft, cw)
     W = soft * idf
     Wn = W / (np.linalg.norm(W, axis=1, keepdims=True) + 1e-9)
     cos = Wn @ Wn.T
 
-    # Self-calibrate the edge bar: globally, off all bridge strengths; anchored, off
-    # the anchor's OWN bridges, so a weakly-bridged hub (roasted cocoa) still surfaces
-    # its best triangles instead of being frozen out by terpene-heavy ingredients.
+    def too_similar(i, j):
+        return cos[i, j] >= max_similarity
+
+    def edge_of(i, j):
+        s = BIT_NAMES[bridge[i, j]]
+        return Edge(names[i], names[j], s, note_family(s), float(strength[i, j]))
+
+    return names, strength, too_similar, edge_of
+
+
+def _molecular_edges(df, max_similarity, compound_names):
+    from .shared import compound_idf, _compound_names
+    names = [row["ingredient"] for _, row in df.iterrows()]
+    csets = [set(row["smiles"]) for _, row in df.iterrows()]
+    cidf, _ = compound_idf(df)
+    cname = compound_names if compound_names is not None else _compound_names()
+
+    # Weighted Jaccard + overlap coefficient via a binary ingredient×compound matrix.
+    vocab = {s: k for k, s in enumerate(sorted({s for cs in csets for s in cs}))}
+    n, m = len(names), len(vocab)
+    M = np.zeros((n, m))
+    wv = np.zeros(m)
+    for s, k in vocab.items():
+        wv[k] = cidf[s]
+    for i, cs in enumerate(csets):
+        for s in cs:
+            M[i, vocab[s]] = 1.0
+    Mw = M * wv[None, :]
+    num = Mw @ M.T                      # Σ_c w_c · a_c · b_c  (shared distinctive mass)
+    mass = Mw.sum(axis=1)
+    denom = mass[:, None] + mass[None, :] - num
+    wj = np.where(denom > 0, num / denom, 0.0)
+    np.fill_diagonal(wj, 0.0)
+    counts = M @ M.T                    # shared compound counts
+    sizes = M.sum(axis=1)
+    overlap = counts / np.maximum(np.minimum(sizes[:, None], sizes[None, :]), 1)
+
+    def too_similar(i, j):
+        return overlap[i, j] >= max_similarity   # one ingredient ~ subset of the other
+
+    def edge_of(i, j):
+        inter = csets[i] & csets[j]
+        top = max(inter, key=lambda s: cidf[s])  # most distinctive shared molecule
+        return Edge(names[i], names[j], cname.get(top, top), top, float(wj[i, j]))
+
+    return names, wj, too_similar, edge_of
+
+
+def _search(names, strength, too_similar, edge_of, categories, anchor, top,
+            edge_percentile, edge_min, min_families, min_categories):
+    idx = {n: i for i, n in enumerate(names)}
+    if anchor is not None and anchor not in idx:
+        raise KeyError(f"{anchor!r} is not a known ingredient")
+
     if edge_min is not None:
         thr = edge_min
     else:
@@ -144,46 +178,78 @@ def find_triangles(
     adj = [set() for _ in range(n)]
     for i in range(n):
         for j in range(i + 1, n):
-            if strength[i, j] >= thr and cos[i, j] < max_similarity:
+            if strength[i, j] >= thr and not too_similar(i, j):
                 adj[i].add(j)
                 adj[j].add(i)
 
-    def make_edge(i, j) -> Edge:
-        s = BIT_NAMES[bridge[i, j]]
-        return Edge(names[i], names[j], s, note_family(s), float(strength[i, j]))
+    out: list[Triangle] = []
 
-    def consider(i, j, k, out):
-        e = [make_edge(i, j), make_edge(j, k), make_edge(i, k)]
-        fams = {x.family for x in e}
+    def consider(i, j, k):
+        e = [edge_of(i, j), edge_of(j, k), edge_of(i, k)]
+        fams = {x.group for x in e}
         cats = {categories.get(names[t], "") for t in (i, j, k)} - {""}
         if len(fams) < min_families or len(cats) < min_categories:
             return
-        out.append(Triangle(
-            members=(names[i], names[j], names[k]), edges=e,
-            weakest=min(x.strength for x in e), families=fams, categories=cats))
+        out.append(Triangle((names[i], names[j], names[k]), e,
+                            min(x.strength for x in e), fams, cats))
 
-    tris: list[Triangle] = []
     if anchor is not None:
         a = idx[anchor]
         nb = sorted(adj[a])
         for x in range(len(nb)):
             for y in range(x + 1, len(nb)):
-                j, k = nb[x], nb[y]
-                if k in adj[j]:
-                    consider(a, j, k, tris)
+                if nb[y] in adj[nb[x]]:
+                    consider(a, nb[x], nb[y])
     else:
         for i in range(n):
             ni = [j for j in adj[i] if j > i]
             for x in range(len(ni)):
                 for y in range(x + 1, len(ni)):
-                    j, k = ni[x], ni[y]
-                    if k in adj[j]:
-                        consider(i, j, k, tris)
+                    if ni[y] in adj[ni[x]]:
+                        consider(i, ni[x], ni[y])
 
-    # Most complementary first: distinct note families, then categories, then the
-    # strength of the weakest edge (so the closed loop is solid all the way round).
-    tris.sort(key=lambda t: (-len(t.families), -len(t.categories), -t.weakest))
-    return tris[:top]
+    out.sort(key=lambda t: (-len(t.families), -len(t.categories), -t.weakest))
+    return out[:top]
+
+
+def find_triangles(
+    sigs=None,
+    idf=None,
+    categories: dict[str, str] | None = None,
+    level: str = "bit",
+    df=None,
+    anchor: str | None = None,
+    top: int = 12,
+    edge_percentile: float = 85.0,
+    edge_min: float | None = None,
+    max_similarity: float = 0.88,
+    min_families: int = 1,
+    min_categories: int = 1,
+    compound_names: dict[str, str] | None = None,
+) -> list[Triangle]:
+    """Find closed A–B–C bridge triangles at the ``bit`` or ``molecular`` level.
+
+    ``bit`` needs `sigs` + `idf`; ``molecular`` needs `df` (compound sets). See the
+    module docstring for what an edge and a "family" mean at each level. Results are
+    ranked by link diversity; `min_families` / `min_categories` hard-filter (set both
+    to 3 for the strict "magical" version).
+    """
+    categories = categories or {}
+    if level == "bit":
+        if sigs is None or idf is None:
+            raise ValueError("bit-level triangles need `sigs` and `idf`")
+        names, strength, too_similar, edge_of = _bit_edges(sigs, idf, max_similarity)
+    elif level == "molecular":
+        if df is None:
+            from .data import load_flavor_network
+            df = load_flavor_network(min_compounds=5)
+        names, strength, too_similar, edge_of = _molecular_edges(
+            df, max_similarity, compound_names)
+    else:
+        raise ValueError(f"unknown level {level!r} (use 'bit' or 'molecular')")
+
+    return _search(names, strength, too_similar, edge_of, categories, anchor, top,
+                   edge_percentile, edge_min, min_families, min_categories)
 
 
 def main() -> None:
@@ -193,9 +259,11 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Find closed A–B–C flavor-bridge triangles.")
     ap.add_argument("anchor", nargs="?", default=None,
                     help="optional ingredient to build triangles around")
+    ap.add_argument("--level", choices=["bit", "molecular"], default="bit",
+                    help="bit = shared sensor / note family; molecular = shared compound")
     ap.add_argument("--top", type=int, default=12)
     ap.add_argument("--magical", action="store_true",
-                    help="require the strict version: 3 distinct note families + 3 categories")
+                    help="require 3 distinct links + 3 categories")
     ap.add_argument("--weighting", choices=["uniform", "specificity"], default="uniform")
     args = ap.parse_args()
 
@@ -204,15 +272,16 @@ def main() -> None:
     idf = idf_weights(sigs)
     cats = dict(zip(df["ingredient"], df["category"]))
 
-    mf = 3 if args.magical else 1
-    mc = 3 if args.magical else 1
-    tris = find_triangles(sigs, idf, categories=cats, anchor=args.anchor, top=args.top,
+    mf = mc = 3 if args.magical else 1
+    tris = find_triangles(sigs=sigs, idf=idf, categories=cats, level=args.level, df=df,
+                          anchor=args.anchor, top=args.top,
                           min_families=mf, min_categories=mc)
     where = f" around {args.anchor}" if args.anchor else ""
-    print(f"\nFlavor triangles{where} — closed A–B–C bridge cycles"
-          f"{' (three distinct note families)' if args.magical else ', best first'}:\n")
+    kind = "shared-compound" if args.level == "molecular" else "sensor-bit"
+    print(f"\n{kind.capitalize()} triangles{where} — closed A–B–C cycles"
+          f"{' (3 distinct links + categories)' if args.magical else ', best first'}:\n")
     if not tris:
-        print("  (none found — try --magical off, or a different ingredient)\n")
+        print("  (none found — drop --magical, or try a different ingredient)\n")
     for t in tris:
         print(t.describe())
         print()
