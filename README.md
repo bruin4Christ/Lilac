@@ -223,11 +223,33 @@ and embedded.
 python scripts/build_app.py            # -> outputs/lilac_pairings.html (self-contained)
 ```
 
-Generates a single static page: pick a base ingredient and its **reinforce / bridge /
-contrast** lists appear side by side, each row showing the partner's category, an
-IDF-weighted similarity meter, and the distinctive sensor that bridges the two
-("garlic ~ chive *via sulfur*"). Click any partner to re-center; 🎲 jumps at random. No
-external requests — all 595 ingredients' pairings are precomputed and embedded.
+Generates a single static page: pick a base ingredient and **four** partner lists appear
+side by side. Three are **bit-level** — **reinforce / bridge / contrast** — each row
+showing the partner's category, an IDF-weighted similarity meter, and the distinctive
+sensor that bridges the two ("garlic ~ chive *via sulfur*"). The fourth, **shared**, is
+**compound-level**: the actual aroma molecules the two foods have in common, so a row
+reads "cocoa ~ hazelnut, *shares* cyclopentapyrazine + 4 more". Click any partner to
+re-center; 🎲 jumps at random. No external requests — all 595 ingredients' pairings are
+precomputed and embedded.
+
+### Shared-compound pairing (the fourth lens)
+
+The three bit-level lenses compare ingredients through their **sensors** — an abstraction
+of structure, so two foods can "match" without sharing a molecule. `lilac.shared` compares
+them through the **molecules they literally share** (the original food-pairing hypothesis,
+Ahn *et al.*). Overlap is weighted by each compound's inverse ingredient-frequency, so
+sharing a *distinctive* compound (a specific pyrazine) counts for far more than a
+ubiquitous one:
+
+```bash
+python -m lilac.shared cocoa                 # rank partners by shared distinctive compounds
+python -m lilac.shared cocoa --with hazelnut  # just the molecules the two share
+```
+
+```
+cocoa ~ roasted_peanut, roasted_filbert, coffee, soybean   (the roasted / Maillard family)
+cocoa ∩ hazelnut: 6,7-dihydro-2,3-dimethyl-5H-cyclopentapyrazine, 2-phenylethanol, …
+```
 
 ### Molecule inspector (HTML app)
 
@@ -252,7 +274,8 @@ src/lilac/
   similarity.py   # hamming / jaccard / cosine, nearest-neighbour lookup
   mapviz.py       # 2-D map (UMAP -> t-SNE -> PCA fallback)
   validate.py     # kNN odor prediction + Morgan baseline + sanity checks
-  pairing.py      # flavor pairing: reinforce / bridge / contrast + CLI
+  pairing.py      # bit-level pairing: reinforce / bridge / contrast + CLI
+  shared.py       # compound-level pairing: the actual molecules two foods share + CLI
   ingredients.py  # 595 real ingredients as superimposed mixtures + IDF pairing CLI
   compose.py      # build a dish: coherence-led ensemble + surprise + hedonic warnings
 scripts/          # thin CLI entry points for the steps above

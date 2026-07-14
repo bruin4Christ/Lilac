@@ -15,9 +15,9 @@ CARDS = [
      "across the sensor palette, each with its role, bridge note, and a Harmonious↔"
      "Adventurous dial.", "compose"),
     ("lilac_pairings.html", "🌸", "Pairing explorer",
-     "For any ingredient, what the model says reinforces, bridges, or contrasts it — "
-     "ranked by IDF-weighted overlap, each pair labelled with the distinctive sensor "
-     "that connects them.", "pair"),
+     "For any ingredient: what reinforces, bridges, or contrasts it by sensor bits — "
+     "plus a fourth lens, the actual aroma molecules two foods literally share "
+     "(the original food-pairing idea).", "pair"),
     ("lilac_molecules.html", "🔬", "Molecule inspector",
      "Open an ingredient and read the molecules inside it — each rendered as its sensor "
      "signature, plus the ingredient's superimposed 'smell number' and a plain-English "
