@@ -25,7 +25,6 @@ def _world():
 
 
 def test_consonance_matrix_and_register():
-    # sulfur completes savory, clashes with sweet/creamy; same-family is redundant
     assert consonance("sulfur", "roasted/animalic") > consonance("sulfur", "fruity/creamy")
     assert consonance("terpene", "terpene") < consonance("terpene", "sulfur")
     assert register("terpene") == "fresh" and register("sulfur") == "savory"
@@ -42,14 +41,13 @@ def test_analyze_anchor_and_lift():
 def test_cross_register_lift_beats_same_register():
     sigs, idf, _ = _world()
     order = [f.partner for f in rank("base", sigs, idf, mode="lifter", max_similarity=1.0)]
-    # herb (terpene, crosses register) should outrank sulfury (savory, same register)
     assert order.index("herb") < order.index("sulfury")
 
 
 def test_deepener_mode_prefers_shared_character():
     sigs, idf, _ = _world()
     order = [f.partner for f in rank("base", sigs, idf, mode="deepener", max_similarity=1.0)]
-    assert order.index("roasty2") < order.index("herb")   # roasty2 has the bigger anchor
+    assert order.index("roasty2") < order.index("herb")
 
 
 def test_suggest_dish_returns_a_deepener_and_a_lifter():

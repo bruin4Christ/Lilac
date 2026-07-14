@@ -16,8 +16,9 @@ each around the base -- a deepener for depth, a lifter for a new dimension (exac
 tomato + tarragon around beef).
 
 A lift only helps if it *belongs*: garlic's sulfur completes savory beef but wrecks a
-custard. So each lift is scored for **consonance** with the base's own character -- a
-hand-set prior over note families (like a musical interval being consonant or not).
+custard. So each lift is scored for **consonance** with the base's own character (a
+hand-set prior over note families) and for **register-novelty** -- a lift that crosses
+to a new register lifts, one that stays in the base's own register merely deepens.
 
     python -m lilac.affinity beef --mode deepener   # partners that deepen beef
     python -m lilac.affinity beef --mode lifter      # partners that lift it (consonantly)
@@ -43,7 +44,6 @@ FAMILIES = ["terpene", "sulfur", "roasted/animalic", "fruity/creamy",
 # lore -- tunable, like the hedonic weights. The low diagonal captures redundancy
 # (adding a terpene lift onto an already-terpene base is the anise-stacking trap).
 _C = {
-    #                      base: terpene sulfur roast fruity phenol oxygen other
     "terpene":            dict(terpene=.45, sulfur=.85, **{"roasted/animalic":.7,  "fruity/creamy":.7,  "phenolic/balsamic":.6,  "oxygenated":.75, "other":.6}),
     "sulfur":             dict(terpene=.7,  sulfur=.45, **{"roasted/animalic":.9,  "fruity/creamy":.15, "phenolic/balsamic":.55, "oxygenated":.8,  "other":.55}),
     "roasted/animalic":   dict(terpene=.6,  sulfur=.85, **{"roasted/animalic":.5,  "fruity/creamy":.75, "phenolic/balsamic":.75, "oxygenated":.7,  "other":.6}),
@@ -119,14 +119,13 @@ def analyze(base: str, partner: str, sigs: dict, idf: np.ndarray) -> Affinity:
 
 def rank(base: str, sigs: dict, idf: np.ndarray, mode: str = "deepener",
          top: int = 12, max_similarity: float = 0.985) -> list[Affinity]:
-    """Rank partners for `base` as deepeners, lifters, or balanced ('dish' scores both).
+    """Rank partners for `base` as deepeners, lifters, or balanced ('both').
 
-    mode: ``deepener`` (by anchor), ``lifter`` (by consonant lift), or ``both``
-    (anchor x consonant-lift, for partners that do a bit of each).
+    mode: ``deepener`` (by anchor), ``lifter`` (by consonant, register-crossing lift),
+    or ``both`` (anchor x lift_score, for partners that do a bit of each).
     """
     if base not in sigs:
         raise KeyError(f"{base!r} is not a known ingredient")
-    cw = idf * _CHAR_MASK
     a = sigs[base].soft
     out = []
     for p in sigs:
@@ -138,7 +137,6 @@ def rank(base: str, sigs: dict, idf: np.ndarray, mode: str = "deepener",
             continue
         out.append(analyze(base, p, sigs, idf))
 
-    # relative labels from this base's own spread
     anchors = np.array([f.anchor for f in out]) if out else np.array([0.0])
     lifts = np.array([f.lift_score for f in out]) if out else np.array([0.0])
     a_hi, l_hi = np.percentile(anchors, 70), np.percentile(lifts, 70)
@@ -163,7 +161,6 @@ def suggest_dish(base: str, sigs: dict, idf: np.ndarray,
     deep = rank(base, sigs, idf, mode="deepener", top=8)
     lift = rank(base, sigs, idf, mode="lifter", top=8)
     deepener = deep[0] if deep else None
-    # pick the top lifter that isn't the deepener and isn't the same category as it
     lifter = None
     for f in lift:
         if deepener and f.partner == deepener.partner:

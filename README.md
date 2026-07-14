@@ -253,20 +253,18 @@ cocoa ∩ hazelnut: 6,7-dihydro-2,3-dimethyl-5H-cyclopentapyrazine, 2-phenyletha
 
 ## Anchor + Lift (pairing, reverse-engineered from the canon)
 
-Ranking partners by *overlap* (reinforce / bridge / contrast) turns out not to
-predict classic pairings — across a set of timeless pairs, overlap sits at chance.
-What *is* consistent is a two-part structure `lilac.affinity` models directly:
+Ranking partners by *overlap* (reinforce / bridge / contrast) turns out not to predict
+classic pairings — across a set of timeless pairs, overlap sits at chance. What *is*
+consistent is a two-part structure `lilac.affinity` models directly:
 
 - **anchor** — the strongest distinctive note two ingredients share (common ground).
 - **lift** — the strongest distinctive note *one brings that the other lacks* (what it
-  adds). A lift is scored for **consonance** (does it belong with this base — garlic's
-  sulfur completes beef but wrecks a custard) and **register-novelty** (does it cross to
-  a new register or just deepen the base's own).
+  adds), scored for **consonance** (garlic's sulfur completes beef but wrecks a custard)
+  and **register-novelty** (does it cross to a new register or just deepen the base's own).
 
-A **deepener** is mostly anchor (strawberry+vanilla); a **lifter** is a big consonant
-lift (tarragon lifting chicken). A dish wants one of each around a base — exactly the
-tomato-deepens / tarragon-lifts structure. Validated against the canon: classic contrast
-pairs land at the **88th percentile** of the lifter ranking.
+A **deepener** is mostly anchor (strawberry+vanilla); a **lifter** is a big consonant lift
+(tarragon lifting chicken). A dish wants one of each around a base. Validated against the
+canon: classic contrast pairs land at the **88th percentile** of the lifter ranking.
 
 ```bash
 python -m lilac.affinity beef --mode deepener   # partners that deepen it

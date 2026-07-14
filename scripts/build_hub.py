@@ -18,6 +18,10 @@ CARDS = [
      "For any ingredient: what reinforces, bridges, or contrasts it by sensor bits — "
      "plus a fourth lens, the actual aroma molecules two foods literally share "
      "(the original food-pairing idea).", "pair"),
+    ("lilac_affinity.html", "⚖", "Affinity",
+     "Every good pairing is a deepener (shares the base's character) plus a lifter "
+     "(adds a new, consonant note) — the model reverse-engineered from timeless "
+     "pairings. Pick a base, get both.", "aff"),
     ("lilac_triangles.html", "△", "Triangle explorer",
      "Closed A–B–C loops where every pair bridges — the best ones bridge on three "
      "different notes. Two levels: shared sensors, or actual shared molecules.", "tri"),
@@ -46,24 +50,24 @@ TEMPLATE = r"""<style>
 :root{
   --bg:#FAF9FE; --surface:#FFFFFF; --surface-2:#F4F1FC; --border:#E7E2F4;
   --text:#1B1726; --muted:#6C6482; --accent:#7C5CF0; --accent-soft:#EEE9FE;
-  --compose:#7C5CF0; --pair:#2E9E6B; --inspect:#C0851C; --tri:#C2568F;
+  --compose:#7C5CF0; --pair:#2E9E6B; --inspect:#C0851C; --tri:#C2568F; --aff:#3557B8;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
 }
 @media (prefers-color-scheme:dark){:root{
   --bg:#121019; --surface:#1A1624; --surface-2:#221C30; --border:#2E2740;
   --text:#ECE7F7; --muted:#9A93AE; --accent:#A78BFF; --accent-soft:#241C3A;
-  --compose:#A78BFF; --pair:#4FBD86; --inspect:#E0A63C; --tri:#E58BB8;
+  --compose:#A78BFF; --pair:#4FBD86; --inspect:#E0A63C; --tri:#E58BB8; --aff:#7C9BEC;
 }}
 :root[data-theme="light"]{
   --bg:#FAF9FE; --surface:#FFFFFF; --surface-2:#F4F1FC; --border:#E7E2F4;
   --text:#1B1726; --muted:#6C6482; --accent:#7C5CF0; --accent-soft:#EEE9FE;
-  --compose:#7C5CF0; --pair:#2E9E6B; --inspect:#C0851C; --tri:#C2568F;
+  --compose:#7C5CF0; --pair:#2E9E6B; --inspect:#C0851C; --tri:#C2568F; --aff:#3557B8;
 }
 :root[data-theme="dark"]{
   --bg:#121019; --surface:#1A1624; --surface-2:#221C30; --border:#2E2740;
   --text:#ECE7F7; --muted:#9A93AE; --accent:#A78BFF; --accent-soft:#241C3A;
-  --compose:#A78BFF; --pair:#4FBD86; --inspect:#E0A63C; --tri:#E58BB8;
+  --compose:#A78BFF; --pair:#4FBD86; --inspect:#E0A63C; --tri:#E58BB8; --aff:#7C9BEC;
 }
 *{box-sizing:border-box}
 body{background:var(--bg)}
@@ -84,12 +88,13 @@ body{background:var(--bg)}
 .card:hover{transform:translateY(-2px)}
 .card.compose:hover{border-color:var(--compose)}
 .card.tri:hover{border-color:var(--tri)}
+.card.aff:hover{border-color:var(--aff)}
 .card.pair:hover{border-color:var(--pair)}
 .card.inspect:hover{border-color:var(--inspect)}
 .ico{font-size:30px;width:56px;height:56px;flex:none;display:grid;place-items:center;
   background:var(--surface-2);border-radius:14px}
 .body h2{margin:0 0 4px;font-size:18px;letter-spacing:-.01em}
-.card.compose h2{color:var(--compose)} .card.pair h2{color:var(--pair)} .card.inspect h2{color:var(--inspect)} .card.tri h2{color:var(--tri)}
+.card.compose h2{color:var(--compose)} .card.pair h2{color:var(--pair)} .card.inspect h2{color:var(--inspect)} .card.tri h2{color:var(--tri)} .card.aff h2{color:var(--aff)}
 .body p{margin:0;color:var(--muted);font-size:13.5px;max-width:56ch}
 .go{margin-left:auto;font-size:22px;color:var(--muted);flex:none}
 .card:hover .go{color:var(--text)}
@@ -103,13 +108,13 @@ body{background:var(--bg)}
     <button class="theme" id="theme" type="button">◑ Theme</button>
   </div>
   <p class="lede">An interpretable map from <b>molecules → a named sensor "nose" → flavor</b>.
-    Four ways in: compose a dish, explore a pairing, find a triangle, or inspect the chemistry.</p>
+    Five ways in: compose a dish, pair by affinity, explore a pairing, find a triangle, or inspect the chemistry.</p>
 
   <div class="cards">
 <!--__CARDS__-->
   </div>
 
-  <p class="foot">All four pages are self-contained and precomputed from
+  <p class="foot">All five pages are self-contained and precomputed from
     <code>lilac.sensors</code> over ~595 ingredients (Ahn <em>et al.</em> Flavor Network).
     Aroma-only hypotheses — read them as leads, not verdicts.</p>
 </div>
