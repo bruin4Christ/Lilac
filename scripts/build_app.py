@@ -23,7 +23,7 @@ from lilac.ingredients import build_ingredient_signatures, idf_weights  # noqa: 
 from lilac.sensors import BIT_NAMES  # noqa: E402
 from lilac.shared import compound_idf, shared_pairings  # noqa: E402
 
-TOP = 10  # partners per list
+TOP = 24  # partners per list (each column scrolls internally beyond the first ~dozen)
 
 
 def build_data() -> dict:
@@ -149,7 +149,7 @@ TEMPLATE = r"""<style>
   --reinforce:#4FBD86; --bridge:#E0A63C; --contrast:#8AA0FF; --shared:#E58BB8; --track:#26203440;
 }
 *{box-sizing:border-box}
-.wrap{max-width:1140px;margin:0 auto;padding:28px 20px 72px;color:var(--text);
+.wrap{max-width:1280px;margin:0 auto;padding:28px 20px 72px;color:var(--text);
   font-family:var(--sans);line-height:1.5;background:var(--bg)}
 body{background:var(--bg)}
 .masthead{display:flex;flex-wrap:wrap;align-items:baseline;gap:12px;
@@ -188,11 +188,14 @@ body{background:var(--bg)}
 .chip{font-family:var(--mono);font-size:12px;color:var(--accent);background:var(--accent-soft);
   border:1px solid var(--border);border-radius:999px;padding:3px 9px}
 
-.cols{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-@media (max-width:1000px){.cols{grid-template-columns:repeat(2,1fr)}}
-@media (max-width:560px){.cols{grid-template-columns:1fr}}
+.cols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+@media (max-width:1080px){.cols{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:600px){.cols{grid-template-columns:1fr}}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;
   overflow:hidden;display:flex;flex-direction:column}
+/* each column's partner list scrolls internally so you can browse well past the
+   first dozen without the page growing to full height */
+[id^="list-"]{overflow-y:auto;max-height:64vh}
 .card h2{font-size:15px;margin:0;padding:14px 16px 4px;display:flex;align-items:center;gap:8px}
 .dot{width:9px;height:9px;border-radius:50%}
 .card .rule{padding:0 16px 12px;color:var(--muted);font-size:12.5px;border-bottom:1px solid var(--border)}
@@ -206,7 +209,8 @@ body{background:var(--bg)}
 .rank{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right}
 .pname{font-family:var(--mono);font-size:14px;color:var(--text);background:none;border:0;
   padding:0;text-align:left;cursor:pointer;text-transform:capitalize;text-decoration:underline;
-  text-decoration-color:var(--border);text-underline-offset:2px}
+  text-decoration-color:var(--border);text-underline-offset:2px;
+  white-space:normal;overflow-wrap:anywhere;line-height:1.35}
 .pname:hover{color:var(--accent);text-decoration-color:var(--accent)}
 .pname:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
 .sub{grid-column:2;display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:2px}
