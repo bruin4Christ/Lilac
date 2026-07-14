@@ -104,7 +104,7 @@ aroma profile, or raw SMILES:
 
 ```bash
 python -m lilac.pairing blueberry --mode reinforce   # smells alike (shared-compound pairing)
-python -m lilac.pairing blueberry --mode bridge       # ~20% overlap: some shared, some new
+python -m lilac.pairing blueberry --mode bridge       # middle overlap: some shared, some new
 python -m lilac.pairing blueberry --mode contrast     # pairing by opposition
 python -m lilac.pairing "CCOC(=O)C,CC(C)=CCCC(C)(O)C=C" --mode all   # any molecule set
 ```
@@ -141,8 +141,17 @@ garlic  ~ chive, shallot, onion, cabbage                        (allium / sulfur
 blueberry contrast: goat milk, sour milk, brussels sprout       (fruity vs dairy/savory)
 ```
 
-Caveat: the data carries no concentrations, so every compound is weighted equally — a
-known simplification (trace character-impact compounds are under-counted).
+Caveat — concentrations: the Ahn data carries no proportions, so by default every
+compound is weighted equally, which under-counts trace character-impact molecules. Two
+levers address this:
+
+- `--weighting specificity` weights each compound by its **inverse ingredient-frequency**
+  (a distinctive compound found in few ingredients counts for more than a background one
+  found in hundreds) — a coarse *impact* proxy that needs no extra data, e.g. it sharpens
+  `coffee` onto its roasted/Maillard cluster.
+- When you *do* have real proportions, pass them straight through:
+  `build_ingredient_signatures(concentrations={"coffee": {"<smiles>": weight, ...}})`
+  overrides the estimate per compound; anything missing falls back to the chosen weighting.
 
 ### Pairing explorer (HTML app)
 

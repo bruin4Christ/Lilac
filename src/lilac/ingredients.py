@@ -29,23 +29,67 @@ from .sensors import BIT_NAMES, active_names
 from .signatures import FlavorSignature, signature_from_smiles
 
 
+def compound_specificity(df) -> dict[str, float]:
+    """Inverse ingredient-frequency weight per compound (a *coarse* impact proxy).
+
+    The Ahn Flavor-Network data carries no concentrations, so every compound would
+    otherwise weigh equally in an ingredient's superposition -- which drowns the
+    trace character-impact molecules that actually define a smell. As a coarse
+    stand-in we weight each compound by how *distinctive* it is: a compound present
+    in few ingredients (log-scaled inverse frequency) is likely character-impact; one
+    in nearly every ingredient is background. This is a proxy for perceptual impact,
+    not a concentration estimate -- swap in real proportions via `concentrations`
+    when available.
+    """
+    n = len(df)
+    doc_freq: dict[str, int] = {}
+    for smiles in df["smiles"]:
+        for s in set(smiles):
+            doc_freq[s] = doc_freq.get(s, 0) + 1
+    return {s: np.log((n + 1) / (f + 1)) + 1.0 for s, f in doc_freq.items()}
+
+
 def build_ingredient_signatures(
     df=None,
     min_compounds: int = 5,
     threshold: float = 0.5,
+    weighting: str = "uniform",
+    concentrations: dict[str, dict[str, float]] | None = None,
 ) -> dict[str, FlavorSignature]:
     """One superimposed signature per ingredient.
 
     Pass a preloaded ingredients DataFrame (columns ``ingredient``/``smiles``) to
     avoid the network fetch; otherwise it is loaded via `load_flavor_network`.
+
+    Compound weighting (the superposition is a weighted per-sensor on-fraction):
+
+    * ``uniform`` -- every compound weighs equally (the historical default).
+    * ``specificity`` -- weigh each compound by its inverse ingredient-frequency,
+      a coarse proxy for character-impact when true concentrations are unknown
+      (see `compound_specificity`).
+
+    `concentrations` optionally supplies real proportions as
+    ``{ingredient: {smiles: weight}}``; any compound found there overrides the
+    `weighting` choice for that ingredient (missing compounds fall back to it).
     """
     if df is None:
         df = load_flavor_network(min_compounds=min_compounds)
+
+    if weighting not in ("uniform", "specificity"):
+        raise ValueError(f"unknown weighting {weighting!r}")
+    spec = compound_specificity(df) if weighting == "specificity" else {}
+
     sigs: dict[str, FlavorSignature] = {}
     for _, row in df.iterrows():
-        sig, _ = signature_from_smiles(row["ingredient"], row["smiles"],
+        name, smiles = row["ingredient"], row["smiles"]
+        conc = (concentrations or {}).get(name, {})
+        weights = [
+            conc.get(s, spec.get(s, 1.0)) if (conc or spec) else 1.0
+            for s in smiles
+        ]
+        sig, _ = signature_from_smiles(name, smiles, weights=weights,
                                        threshold=threshold)
-        sigs[row["ingredient"]] = sig
+        sigs[name] = sig
     return sigs
 
 
@@ -73,9 +117,13 @@ def main() -> None:
     ap.add_argument("--top", type=int, default=8)
     ap.add_argument("--min-compounds", type=int, default=5)
     ap.add_argument("--no-idf", action="store_true", help="disable IDF sensor weighting")
+    ap.add_argument("--weighting", choices=["uniform", "specificity"], default="uniform",
+                    help="compound weighting in each ingredient's superposition "
+                         "(specificity ~ a coarse character-impact proxy)")
     args = ap.parse_args()
 
-    sigs = build_ingredient_signatures(min_compounds=args.min_compounds)
+    sigs = build_ingredient_signatures(min_compounds=args.min_compounds,
+                                       weighting=args.weighting)
     weights = None if args.no_idf else idf_weights(sigs)
 
     # Query: an ingredient in the library, else a reference aroma / SMILES set.
@@ -89,7 +137,8 @@ def main() -> None:
     print(f"\nLibrary: {len(sigs)} ingredients. "
           f"Query: {query.descriptor} ({query.n_molecules} compounds)")
     print(f"  active sensors: {', '.join(active_names(query.crisp)) or '(none above threshold)'}")
-    print(f"  weighting: {'IDF' if weights is not None else 'plain cosine'}\n")
+    print(f"  compound weighting: {args.weighting}; "
+          f"sensor weighting: {'IDF' if weights is not None else 'plain cosine'}\n")
 
     bridge_label = (f"~{args.target:.0%} sim" if args.target is not None
                     else f"p{args.target_pct:.0f} of own partners")
