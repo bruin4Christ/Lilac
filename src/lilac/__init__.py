@@ -1,6 +1,6 @@
 """Lilac -- an interpretable olfactory map.
 
-Molecules become a 40-bit "nose" (see :mod:`lilac.sensors`), which aggregates into
+Molecules become a sensor "nose" (see :mod:`lilac.sensors`), which aggregates into
 per-flavor signatures (:mod:`lilac.signatures`) and a 2-D map (:mod:`lilac.mapviz`).
 """
 

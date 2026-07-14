@@ -1,12 +1,12 @@
 """Per-flavor signatures.
 
-Given every molecule's 40-bit code and its odor labels, a *flavor signature* is
+Given every molecule's sensor code and its odor labels, a *flavor signature* is
 what the "nose" tends to report for that flavor. For each descriptor we look at
 all molecules carrying it and, per bit, measure how often that sensor fires:
 
-* **soft signature** -- a 40-d vector of on-fractions in [0, 1]
+* **soft signature** -- an N_BITS-long vector of on-fractions in [0, 1]
 * **crisp signature** -- the soft vector thresholded at 0.5, i.e. the flavor's
-  own 40-bit "number"
+  own sensor "number"
 
 This is deliberately simple and readable. `top_bits` turns a signature back into
 a ranked list of named sensors so "lemon" can be described in words.
@@ -80,7 +80,7 @@ def build_signatures(
     min_molecules: int = 5,
     threshold: float = 0.5,
 ) -> dict[str, FlavorSignature]:
-    """Aggregate 40-bit codes into one signature per descriptor.
+    """Aggregate sensor codes into one signature per descriptor.
 
     Parameters
     ----------

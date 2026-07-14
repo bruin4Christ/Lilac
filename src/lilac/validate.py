@@ -1,10 +1,10 @@
-"""Validation: does the 40-bit nose actually carry smell information?
+"""Validation: does the sensor nose actually carry smell information?
 
 Two checks, both runnable as ``python -m lilac.validate``:
 
 1. **Held-out odor prediction.** Split the molecules, and for each test molecule
    predict its odor descriptors by majority vote among its k nearest neighbours
-   in the training set. We score this for the interpretable 40-bit code and, as a
+   in the training set. We score this for the interpretable sensor code and, as a
    ceiling, for a full 2048-bit Morgan fingerprint. The gap tells you how much
    legibility costs in accuracy.
 
@@ -99,28 +99,28 @@ def main() -> None:
     smiles = df["smiles"].tolist()
     labels = df["labels"].tolist()
 
-    # 40-bit interpretable codes
-    codes40, ok40 = encode_frame(smiles)
+    # Interpretable sensor codes
+    codes_nose, ok_nose = encode_frame(smiles)
     label_matrix = df[descriptors].to_numpy().astype(np.uint8)
-    y40 = label_matrix[ok40]
+    y_nose = label_matrix[ok_nose]
 
-    print(f"Loaded {len(df)} molecules; {ok40.sum()} encoded, "
-          f"{(~ok40).sum()} unparseable. {len(descriptors)} descriptors.\n")
+    print(f"Loaded {len(df)} molecules; {ok_nose.sum()} encoded, "
+          f"{(~ok_nose).sum()} unparseable. {len(descriptors)} descriptors.\n")
 
     print("== Held-out odor prediction (5-NN) ==")
-    res40 = evaluate_knn(codes40, y40, k=5, metric="jaccard")
-    print(f"  40-bit nose     micro-F1={res40['micro_f1']:.3f}  "
-          f"macro-F1={res40['macro_f1']:.3f}  samples-F1={res40['samples_f1']:.3f}")
+    res_nose = evaluate_knn(codes_nose, y_nose, k=5, metric="jaccard")
+    print(f"  {codes_nose.shape[1]}-bit nose  micro-F1={res_nose['micro_f1']:.3f}  "
+          f"macro-F1={res_nose['macro_f1']:.3f}  samples-F1={res_nose['samples_f1']:.3f}")
 
     codesM, okM = morgan_codes(smiles)
     yM = label_matrix[okM]
     resM = evaluate_knn(codesM, yM, k=5, metric="jaccard")
     print(f"  Morgan-2048     micro-F1={resM['micro_f1']:.3f}  "
           f"macro-F1={resM['macro_f1']:.3f}  samples-F1={resM['samples_f1']:.3f}")
-    print(f"  (baseline uses {codesM.shape[1]} bits vs the nose's {codes40.shape[1]})\n")
+    print(f"  (baseline uses {codesM.shape[1]} bits vs the nose's {codes_nose.shape[1]})\n")
 
     print("== Perceptual sanity (distance between flavor signatures) ==")
-    sigs = build_signatures(codes40, [labels[i] for i in np.where(ok40)[0]],
+    sigs = build_signatures(codes_nose, [labels[i] for i in np.where(ok_nose)[0]],
                             descriptors)
     checks = perceptual_checks(
         sigs,

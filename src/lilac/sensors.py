@@ -1,6 +1,7 @@
-"""The 40-bit "nose".
+"""The sensor "nose".
 
-Every molecule is reduced to 40 on/off sensors. The design goal is *legibility*:
+Every molecule is reduced to a fixed panel of `N_BITS` on/off sensors (55 today,
+but the panel is a design knob meant to grow). The design goal is *legibility*:
 each bit has a name and a chemical/perceptual reason, so a flavor's signature can
 be read directly ("lemon = aldehydic + terpene + ester + ...").
 
@@ -15,7 +16,7 @@ Two kinds of sensor:
 The public surface is small:
 
     from lilac.sensors import encode, BIT_NAMES, N_BITS
-    bits = encode("CC(=O)OCC")      # -> np.uint8 array of length 40
+    bits = encode("CC(=O)OCC")      # -> np.uint8 array of length N_BITS
     dict(zip(BIT_NAMES, bits))      # -> readable {name: 0/1}
 
 `encode` returns None for SMILES RDKit cannot parse, so callers can drop them.
@@ -228,7 +229,7 @@ def encode_frame(smiles_list) -> tuple[np.ndarray, np.ndarray]:
 
 
 def bits_to_string(bits: np.ndarray) -> str:
-    """Render a 40-bit code as its compact binary string, e.g. '0101...'."""
+    """Render an N_BITS code as its compact binary string, e.g. '0101...'."""
     return "".join(str(int(b)) for b in bits)
 
 
