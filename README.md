@@ -10,21 +10,22 @@ grew to 55 when a larger-structure tier was added; see below.)
 
 ## Launch the apps
 
-One command builds both web apps and serves them locally:
+One command builds the three web apps + a hub and serves them locally:
 
 ```bash
-python scripts/launch.py          # build both + serve at http://127.0.0.1:8000
+python scripts/launch.py          # build all + serve at http://127.0.0.1:8000
 #   make app                      # same thing, if you prefer make
 #   python scripts/launch.py --build-only   # just regenerate the HTML files
 ```
 
-It prints a link to each:
+It opens a **🏠 hub** (`index.html`) that links the three:
 
-- **🌸 Pairing explorer** — `http://127.0.0.1:8000/lilac_pairings.html`
-- **🔬 Molecule inspector** — `http://127.0.0.1:8000/lilac_molecules.html`
+- **🍽 Composition studio** — `lilac_compose.html` — grow a whole dish from one base
+- **🌸 Pairing explorer** — `lilac_pairings.html` — reinforce / bridge / contrast partners
+- **🔬 Molecule inspector** — `lilac_molecules.html` — the molecules inside an ingredient
 
-(First run fetches + caches the datasets, so give it a few seconds.) Prefer not to run
-anything? Both are also published as shareable artifacts from the chat.
+(First run fetches + caches the datasets, so give it a few seconds.) Every page is
+self-contained with no external requests, so they also work opened straight from disk.
 
 ---
 
@@ -197,6 +198,20 @@ Dish built on garlic:
       ⚠ leans challenging (sulfur, amine, thiazole)
   [reinforce] boiled_beef   via sulfur; adds pyrazine, ketone, carboxylic_acid; vegetable→meat leap
 ```
+
+### Composition studio (HTML app)
+
+```bash
+python scripts/build_compose_app.py    # -> outputs/lilac_compose.html (self-contained)
+```
+
+The composition layer made clickable: pick a base and a full **dish** appears — each
+partner as a card showing its role (reinforce / bridge / accent), the distinctive sensor
+it bridges on, the new notes it brings, any culinary-category leap, and a ⚠ hedonic
+caution (never a filter). A **Harmonious ↔ Adventurous** toggle dials how far the dish
+reaches, and a **dish palette** strip shows the combined signature across all sensors.
+Click any partner to grow a new dish from it. All 590 ingredients' dishes are precomputed
+and embedded.
 
 ### Pairing explorer (HTML app)
 
