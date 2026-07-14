@@ -2,8 +2,8 @@
 
     python scripts/build_molecule_widget.py
 
-Pick a raw ingredient and inspect the molecules inside it: each molecule's 55-bit
-sensor signature (as a colour-coded strip + hex), its SMILES, and the ingredient's
+Pick a raw ingredient and inspect the molecules inside it: each molecule's per-sensor
+signature (as a colour-coded strip + hex), its SMILES, and the ingredient's
 own superimposed signature (per sensor, the fraction of its molecules that fire it).
 Writes outputs/lilac_molecules.html. No external requests.
 """
@@ -20,11 +20,13 @@ import numpy as np  # noqa: E402
 
 from lilac.data import load_flavor_network, load_odorant_library  # noqa: E402
 from lilac.sensors import (  # noqa: E402
+    _COMPOSITION,
     _DESCRIPTOR,
     _LARGE_STRUCTURAL,
     _LARGE_TOPO,
     _STRUCTURAL,
     BIT_NAMES,
+    N_BITS,
     encode,
 )
 
@@ -72,6 +74,7 @@ DESCRIPTIONS: dict[str, str] = {
     "decalin": "a fused saturated bicyclic (woody, ambery)",
     "oxane_ring": "a tetrahydropyran ring (rose oxide, sugars)",
     "polyene": "an extended conjugated chain (carotenoid-like)",
+    "phthalide": "a phthalide lactone (celery, lovage, angelica — the umbellifer note)",
     # physicochemical
     "mw_low": "light molecule, MW under 120 (volatile)",
     "mw_high": "heavy molecule, MW over 200 (less volatile)",
@@ -91,15 +94,34 @@ DESCRIPTIONS: dict[str, str] = {
     "fused_ring_sys": "any shared-edge ring system",
     "polycyclic": "three or more rings",
     "large_scaffold": "a big molecule, 16+ heavy atoms",
+    # composition: counts, atom budget, chain length (toward an assemblable code)
+    "chain_c2_3": "longest carbon chain of 2–3",
+    "chain_c4_5": "longest carbon chain of 4–5",
+    "chain_c6_9": "longest carbon chain of 6–9",
+    "chain_c10plus": "longest carbon chain of 10+",
+    "methyl_2plus": "two or more methyl groups",
+    "methyl_3plus": "three or more methyl groups",
+    "hydroxyl_2plus": "two or more -OH groups (polyol)",
+    "ester_2plus": "two or more ester groups",
+    "carbon_le4": "4 or fewer carbons (small)",
+    "carbon_5_7": "5–7 carbons",
+    "carbon_8_11": "8–11 carbons",
+    "carbon_12plus": "12 or more carbons (large)",
+    "oxygen_2plus": "two or more oxygen atoms",
+    "oxygen_3plus": "three or more oxygen atoms",
+    "nitrogen_1plus": "at least one nitrogen atom",
+    "nitrogen_2plus": "two or more nitrogen atoms",
 }
 
 GROUP_NAMES = ["structural “corner” detectors", "larger scaffolds",
-               "physicochemical properties", "whole-molecule topology"]
+               "physicochemical properties", "whole-molecule topology",
+               "composition (counts, size, chain)"]
 
 
 def sensor_groups() -> list[int]:
-    """Group id per bit: 0 structural, 1 large-scaffold, 2 physicochemical, 3 topology."""
-    sizes = [len(_STRUCTURAL), len(_LARGE_STRUCTURAL), len(_DESCRIPTOR), len(_LARGE_TOPO)]
+    """Group id per bit: 0 structural, 1 scaffold, 2 physicochem, 3 topology, 4 composition."""
+    sizes = [len(_STRUCTURAL), len(_LARGE_STRUCTURAL), len(_DESCRIPTOR),
+             len(_LARGE_TOPO), len(_COMPOSITION)]
     groups = []
     for g, n in enumerate(sizes):
         groups += [g] * n
@@ -152,6 +174,7 @@ def build_data() -> dict:
 def main() -> None:
     data = build_data()
     html = TEMPLATE.replace("/*__DATA__*/", json.dumps(data, separators=(",", ":")))
+    html = html.replace("__NBITS__", str(N_BITS))     # keep prose in sync with the panel
     out = Path("outputs/lilac_molecules.html")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html, encoding="utf-8")
@@ -165,7 +188,7 @@ TEMPLATE = r"""<style>
   --bg:#FAF9FE; --surface:#FFFFFF; --surface-2:#F4F1FC; --border:#E7E2F4;
   --text:#1B1726; --muted:#6C6482; --accent:#7C5CF0; --accent-soft:#EEE9FE;
   --track:#E9E4F5; --on:#1B1726;
-  --g0:#7C5CF0; --g1:#1FA8A0; --g2:#5670D6; --g3:#C0851C;
+  --g0:#7C5CF0; --g1:#1FA8A0; --g2:#5670D6; --g3:#C0851C; --g4:#C2568F;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
 }
@@ -173,19 +196,19 @@ TEMPLATE = r"""<style>
   --bg:#121019; --surface:#1A1624; --surface-2:#221C30; --border:#2E2740;
   --text:#ECE7F7; --muted:#9A93AE; --accent:#A78BFF; --accent-soft:#241C3A;
   --track:#2A2338; --on:#ECE7F7;
-  --g0:#A78BFF; --g1:#37C4BB; --g2:#8AA0FF; --g3:#E0A63C;
+  --g0:#A78BFF; --g1:#37C4BB; --g2:#8AA0FF; --g3:#E0A63C; --g4:#E58BB8;
 }}
 :root[data-theme="light"]{
   --bg:#FAF9FE; --surface:#FFFFFF; --surface-2:#F4F1FC; --border:#E7E2F4;
   --text:#1B1726; --muted:#6C6482; --accent:#7C5CF0; --accent-soft:#EEE9FE;
   --track:#E9E4F5; --on:#1B1726;
-  --g0:#7C5CF0; --g1:#1FA8A0; --g2:#5670D6; --g3:#C0851C;
+  --g0:#7C5CF0; --g1:#1FA8A0; --g2:#5670D6; --g3:#C0851C; --g4:#C2568F;
 }
 :root[data-theme="dark"]{
   --bg:#121019; --surface:#1A1624; --surface-2:#221C30; --border:#2E2740;
   --text:#ECE7F7; --muted:#9A93AE; --accent:#A78BFF; --accent-soft:#241C3A;
   --track:#2A2338; --on:#ECE7F7;
-  --g0:#A78BFF; --g1:#37C4BB; --g2:#8AA0FF; --g3:#E0A63C;
+  --g0:#A78BFF; --g1:#37C4BB; --g2:#8AA0FF; --g3:#E0A63C; --g4:#E58BB8;
 }
 *{box-sizing:border-box}
 body{background:var(--bg)}
@@ -278,7 +301,7 @@ body{background:var(--bg)}
   <header class="masthead">
     <div class="logo"><b>lilac</b> · molecule inspector</div>
     <div class="tagline">A raw ingredient is many molecules at once. Pick one to see every
-      constituent's 55-bit sensor signature — and how they superimpose into the ingredient's
+      constituent's __NBITS__-bit sensor signature — and how they superimpose into the ingredient's
       own code.</div>
   </header>
 
@@ -297,7 +320,7 @@ body{background:var(--bg)}
 
   <section class="panel" id="superimposed" aria-live="polite">
     <h3>Superimposed signature</h3>
-    <p class="hint">Each of the 55 sensors, shaded by the share of this ingredient's molecules
+    <p class="hint">Each of the __NBITS__ sensors, shaded by the share of this ingredient's molecules
       that trip it. This is the ingredient "smell number" — many molecules stacked on one bitmask.</p>
     <div class="strip big" id="supstrip"></div>
     <div class="chips" id="supchips"></div>
@@ -316,12 +339,12 @@ body{background:var(--bg)}
   <div id="mollist"></div>
 
   <details class="index" id="index">
-    <summary><span class="caret">▸</span> The 55 sensors — what each bit means
+    <summary><span class="caret">▸</span> The __NBITS__ sensors — what each bit means
       <span class="sub">· index &amp; colour key</span></summary>
     <div class="idxbody" id="idxbody"></div>
   </details>
 
-  <p class="foot">55-bit signatures from <code>lilac.sensors</code>; molecules per ingredient from
+  <p class="foot">__NBITS__-bit signatures from <code>lilac.sensors</code>; molecules per ingredient from
     the Ahn <em>et al.</em> Flavor Network (compounds resolved to structures by name, ~65%
     coverage). A molecule's cell is lit when its sensor fires; the superimposed strip shades each
     sensor by prevalence across the ingredient's molecules.</p>
@@ -340,7 +363,7 @@ function litSet(bits){const s=new Set(bits);return s;}
 function hexOf(bits){let v=0n;for(const b of bits)v|=(1n<<BigInt(NB-1-b));
   return "0x"+v.toString(16).toUpperCase().padStart(Math.ceil(NB/4),"0");}
 
-// a 55-cell strip; `fill` maps bit->intensity[0..1] (superimposed) or a Set (molecule)
+// a __NBITS__-cell strip; `fill` maps bit->intensity[0..1] (superimposed) or a Set (molecule)
 function stripHTML(fill){
   let h="";
   for(let i=0;i<NB;i++){
@@ -358,7 +381,7 @@ function stripHTML(fill){
   return h;
 }
 
-// static reference: all 55 bits, grouped and glossed
+// static reference: all __NBITS__ bits, grouped and glossed
 function buildIndex(){
   let h="";
   const order=[...groups.keys()].sort((a,b)=>groups[a]-groups[b]||a-b);
@@ -380,7 +403,7 @@ function render(i){
   const ing=ings[i];
   const list=ing.mols.map(m=>mols[m]);
   el("ihead").innerHTML=`<span class="name">${cap(ing.name)}</span>
-    <span class="meta"><b>${ing.cat}</b> · <b>${list.length}</b> molecules · 55 sensors</span>`;
+    <span class="meta"><b>${ing.cat}</b> · <b>${list.length}</b> molecules · __NBITS__ sensors</span>`;
 
   // superimposed: fraction of molecules lighting each bit
   const frac=new Array(NB).fill(0);

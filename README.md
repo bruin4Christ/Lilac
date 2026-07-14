@@ -1,30 +1,33 @@
 # Lilac — an interpretable olfactory map
 
-Model the nose as a fixed panel of **55 on/off sensors**. A molecule's structural
-"facets" (methyl, acetyl, ester, aromatic ring, sulfur, …) *and* its larger scaffolds
-(macrocyclic musk, coumarin, indole, terpenoid skeleton, …) switch on a *subset* of
-those sensors, so every molecule gets a compact **bit-code**. Aggregate the codes for
+Model the nose as a fixed panel of **72 on/off sensors**. A molecule's structural
+"facets" (methyl, acetyl, ester, aromatic ring, sulfur, …), its larger scaffolds
+(macrocyclic musk, coumarin, indole, terpenoid skeleton, …), *and* its coarse
+composition (carbon/oxygen count, chain length, how many methyls) switch on a *subset*
+of those sensors, so every molecule gets a compact **bit-code**. Aggregate the codes for
 all molecules that smell "lemon", and you get lemon's own signature — the compact
 "smell number" for a flavor. (The panel width is a design knob — it started at 40 and
-grew to 55 when a larger-structure tier was added; see below.)
+grew to 72 as new tiers were added: larger structures, then a composition tier that
+makes the code more *assemblable* back into a structure; see below.)
 
 ## Launch the apps
 
-One command builds both web apps and serves them locally:
+One command builds the three web apps + a hub and serves them locally:
 
 ```bash
-python scripts/launch.py          # build both + serve at http://127.0.0.1:8000
+python scripts/launch.py          # build all + serve at http://127.0.0.1:8000
 #   make app                      # same thing, if you prefer make
 #   python scripts/launch.py --build-only   # just regenerate the HTML files
 ```
 
-It prints a link to each:
+It opens a **🏠 hub** (`index.html`) that links the three:
 
-- **🌸 Pairing explorer** — `http://127.0.0.1:8000/lilac_pairings.html`
-- **🔬 Molecule inspector** — `http://127.0.0.1:8000/lilac_molecules.html`
+- **🍽 Composition studio** — `lilac_compose.html` — grow a whole dish from one base
+- **🌸 Pairing explorer** — `lilac_pairings.html` — reinforce / bridge / contrast partners
+- **🔬 Molecule inspector** — `lilac_molecules.html` — the molecules inside an ingredient
 
-(First run fetches + caches the datasets, so give it a few seconds.) Prefer not to run
-anything? Both are also published as shareable artifacts from the chat.
+(First run fetches + caches the datasets, so give it a few seconds.) Every page is
+self-contained with no external requests, so they also work opened straight from disk.
 
 ---
 
@@ -36,7 +39,7 @@ This is a small, deliberately *legible* take on real olfactory science:
 | Structural facets → bits | **Molecular fingerprints** (Morgan/ECFP) — bits mark substructures |
 | Each flavor → its own bit-signature | **Principal Odor Map** (Google/Osmo, *Science* 2023) — a learned map where odors are regions |
 
-The twist Lilac adds: the code is small (55 bits) and named enough that you can *read*
+The twist Lilac adds: the code is compact (72 bits) and named enough that you can *read*
 it — every bit has a name and a reason.
 
 ## What it does
@@ -46,9 +49,9 @@ it — every bit has a name and a reason.
    library** unioned across six pyrfume archives (GoodScents, Leffingwell, IFRA, Sigma,
    AromaDb, FlavorNet), all fetched from the public
    [pyrfume-data](https://github.com/pyrfume/pyrfume-data) archive.
-2. **Encodes each molecule** into a 55-bit code (`src/lilac/sensors.py`) — 29 SMARTS
-   "corner" detectors + 9 larger scaffolds + 11 physicochemical + 6 whole-molecule
-   topology sensors, all via RDKit.
+2. **Encodes each molecule** into a 72-bit code (`src/lilac/sensors.py`) — 29 SMARTS
+   "corner" detectors + 10 larger scaffolds + 11 physicochemical + 6 whole-molecule
+   topology + 16 composition (counts / atom budget / chain length) sensors, all via RDKit.
 3. **Builds per-flavor signatures** — the characteristic bit pattern of each odor.
 4. **Draws the map** — a 2-D layout of all molecules, coloured by odor family.
 5. **Validates** — held-out odor prediction (vs. a 2048-bit Morgan baseline) and a
@@ -58,11 +61,11 @@ it — every bit has a name and a reason.
 
 ```
 Held-out odor prediction (5-NN):        micro-F1   macro-F1
-  55-bit nose                             0.393      0.235   <- beats baseline on macro-F1
-  Morgan-2048  (51x more bits, opaque)    0.403      0.227
+  72-bit nose                             0.397      0.235   <- beats baseline on macro-F1
+  Morgan-2048  (28x more bits, opaque)    0.403      0.227
 ```
 
-The compact, human-readable 55-bit code lands within ~1 micro-F1 point of a full
+The compact, human-readable 72-bit code lands within ~1 micro-F1 point of a full
 2048-bit fingerprint — and *ahead* of it on macro-F1, where the larger-structure
 sensors (indole→jasmine, coumarin→hay) help the rare odor classes. Legibility is
 nearly free.
@@ -104,7 +107,7 @@ aroma profile, or raw SMILES:
 
 ```bash
 python -m lilac.pairing blueberry --mode reinforce   # smells alike (shared-compound pairing)
-python -m lilac.pairing blueberry --mode bridge       # ~20% overlap: some shared, some new
+python -m lilac.pairing blueberry --mode bridge       # middle overlap: some shared, some new
 python -m lilac.pairing blueberry --mode contrast     # pairing by opposition
 python -m lilac.pairing "CCOC(=O)C,CC(C)=CCCC(C)(O)C=C" --mode all   # any molecule set
 ```
@@ -118,14 +121,14 @@ label. Build your own with `signatures.signature_from_smiles(name, smiles, weigh
 
 A real ingredient isn't one molecule — it's a *mixture*, so its signature is the
 **superposition** of its constituent volatiles on the sensor panel (per bit, the
-fraction of the ingredient's compounds that fire it). Lilac builds **590 ingredients**
+fraction of the ingredient's compounds that fire it). Lilac builds **595 ingredients**
 from the [Ahn et al. *Flavor Network*](https://www.nature.com/articles/srep00196)
 ingredient–compound data, mapping each compound to a structure via the odorant library
-(~65% of compounds resolve; the matched ones are the common aroma molecules).
+(~66% of compounds resolve by name — greek-prefix (δ-/γ-), n- and synonym matching recover the rest, including the δ-lactones that give coconut its character).
 
 ```bash
 python scripts/build_ingredients.py                     # -> outputs/ingredient_signatures.csv
-python -m lilac.ingredients blueberry --mode all        # pair one ingredient vs the other 589
+python -m lilac.ingredients blueberry --mode all        # pair one ingredient vs the other 594
 python -m lilac.ingredients coffee   --mode reinforce   # coffee ~ cocoa, roasted peanut, beef
 python -m lilac.ingredients garlic   --mode contrast --no-idf
 ```
@@ -141,8 +144,78 @@ garlic  ~ chive, shallot, onion, cabbage                        (allium / sulfur
 blueberry contrast: goat milk, sour milk, brussels sprout       (fruity vs dairy/savory)
 ```
 
-Caveat: the data carries no concentrations, so every compound is weighted equally — a
-known simplification (trace character-impact compounds are under-counted).
+Caveat — concentrations: the Ahn data carries no proportions, so by default every
+compound is weighted equally, which under-counts trace character-impact molecules. Two
+levers address this:
+
+- `--weighting specificity` weights each compound by its **inverse ingredient-frequency**
+  (a distinctive compound found in few ingredients counts for more than a background one
+  found in hundreds) — a coarse *impact* proxy that needs no extra data, e.g. it sharpens
+  `coffee` onto its roasted/Maillard cluster.
+- When you *do* have real proportions, pass them straight through:
+  `build_ingredient_signatures(concentrations={"coffee": {"<smiles>": weight, ...}})`
+  overrides the estimate per compound; anything missing falls back to the chosen weighting.
+
+## Composition — building a dish, not just a pair
+
+Pairing answers "what goes with X?"; a recipe is a *composition* problem. `compose`
+grows a small ensemble from a base ingredient, greedily adding the partner that
+brings the most **new distinctive aroma** while still sharing a **bridge** with
+what is already on the plate:
+
+```bash
+python -m lilac.compose coffee --size 4      # coffee + popcorn + filbert + ...  (roasted/nutty)
+python -m lilac.compose garlic --size 4      # garlic ~ durian, grape brandy, boiled beef (sulfur family)
+python -m lilac.compose blueberry --size 5   # fruit + herb/terpene bridges
+```
+
+Each addition is scored on four interpretable, tunable forces:
+
+- **complementarity + coherence** — coherence to the palette so far leads (keeping
+  the dish connected and base-specific), with a bonus for the single best *new*
+  distinctive note. Scoring runs on the smell-carrying sensors only (the 11 gross
+  physicochemical descriptors are excluded so broad ingredients don't dominate).
+- **bridge** — every pick names the distinctive sensor it joins on ("cocoa *via*
+  pyrazine"), and reports the new sensors it introduces.
+- **surprise** — a bonus for a bridging pick from a *different culinary category*
+  (the food-pairing hypothesis: unexpected foods sharing a key aroma), e.g.
+  beef → roasted shrimp *via pyrazine*.
+- **diversity** — an adaptive redundancy penalty (`--diversity`, default on): each
+  pick is docked for resembling an ingredient already on the plate, so a dish spans
+  the palette instead of stacking near-duplicates. It's *base-agnostic* — it breaks
+  up a monotone dish (olive's four fermented fruits) yet leaves a coherent
+  single-theme dish intact when its partners are mutually distinct (garlic → durian,
+  grape brandy, boiled beef — all allium, none a duplicate of another).
+- **challenge** — a *non-eliminating* hedonic flag. Ingredients leaning on
+  polarizing notes (sulfur, amine, indole…) get a ⚠ warning, and *optionally* a
+  gentle ranking nudge (`--challenge-weight`, default **0** = warn only). It never
+  filters: a bold pairing (durian, blue cheese, garlic) is always reachable.
+
+```
+$ python -m lilac.compose garlic --size 3
+Dish built on garlic:
+  [base     ] garlic
+      ⚠ leans challenging (sulfur, thiazole, phenol)
+  [reinforce] durian        via sulfur; adds ester, ether, methoxy; vegetable→fruit leap
+      ⚠ leans challenging (sulfur, amine, thiazole)
+  [reinforce] boiled_beef   via sulfur; adds pyrazine, ketone, carboxylic_acid; vegetable→meat leap
+```
+
+### Composition studio (HTML app)
+
+```bash
+python scripts/build_compose_app.py    # -> outputs/lilac_compose.html (self-contained)
+```
+
+The composition layer made clickable: pick a base and a full **dish** appears — each
+partner as a card showing its role (reinforce / bridge / accent), the distinctive sensor
+it bridges on, the new notes it brings, any culinary-category leap, and a ⚠ hedonic
+caution (never a filter). A **Harmonious ↔ Adventurous** toggle dials how far the dish
+reaches, a **Balanced ↔ Character** toggle chooses uniform vs distinctive-compound weighting
+(the latter rescues trace-character foods like coconut), and a **dish palette** strip shows
+the combined signature across all sensors.
+Click any partner to grow a new dish from it. All 595 ingredients' dishes are precomputed
+and embedded.
 
 ### Pairing explorer (HTML app)
 
@@ -150,11 +223,69 @@ known simplification (trace character-impact compounds are under-counted).
 python scripts/build_app.py            # -> outputs/lilac_pairings.html (self-contained)
 ```
 
-Generates a single static page: pick a base ingredient and its **reinforce / bridge /
-contrast** lists appear side by side, each row showing the partner's category, an
-IDF-weighted similarity meter, and the distinctive sensor that bridges the two
-("garlic ~ chive *via sulfur*"). Click any partner to re-center; 🎲 jumps at random. No
-external requests — all 590 ingredients' pairings are precomputed and embedded.
+Generates a single static page: pick a base ingredient and **four** partner lists appear
+side by side. Three are **bit-level** — **reinforce / bridge / contrast** — each row
+showing the partner's category, an IDF-weighted similarity meter, and the distinctive
+sensor that bridges the two ("garlic ~ chive *via sulfur*"). The fourth, **shared**, is
+**compound-level**: the actual aroma molecules the two foods have in common, so a row
+reads "cocoa ~ hazelnut, *shares* cyclopentapyrazine + 4 more". Click any partner to
+re-center; 🎲 jumps at random. No external requests — all 595 ingredients' pairings are
+precomputed and embedded.
+
+### Shared-compound pairing (the fourth lens)
+
+The three bit-level lenses compare ingredients through their **sensors** — an abstraction
+of structure, so two foods can "match" without sharing a molecule. `lilac.shared` compares
+them through the **molecules they literally share** (the original food-pairing hypothesis,
+Ahn *et al.*). Overlap is weighted by each compound's inverse ingredient-frequency, so
+sharing a *distinctive* compound (a specific pyrazine) counts for far more than a
+ubiquitous one:
+
+```bash
+python -m lilac.shared cocoa                 # rank partners by shared distinctive compounds
+python -m lilac.shared cocoa --with hazelnut  # just the molecules the two share
+```
+
+```
+cocoa ~ roasted_peanut, roasted_filbert, coffee, soybean   (the roasted / Maillard family)
+cocoa ∩ hazelnut: 6,7-dihydro-2,3-dimethyl-5H-cyclopentapyrazine, 2-phenylethanol, …
+```
+
+## Flavor triangles
+
+A pairing is an edge; `lilac.triangles` finds closed **A–B–C bridge cycles** — three
+ingredients where every pair bridges, and (the magic) each edge is carried by a
+*different* link. It works at **two levels**, mirroring the pairing lenses:
+
+- **bit** — each edge is the distinctive shared *sensor*; magical = three distinct
+  **note families** (terpene / sulfur / roasted / fruity / phenolic / oxygenated).
+- **molecular** — each edge is an actual shared *compound*; magical = three different
+  **molecules**, one per edge (the literal food-pairing hypothesis, closed into a loop).
+
+```bash
+python -m lilac.triangles                    # best bit-level triangles
+python -m lilac.triangles --level molecular   # shared-compound triangles
+python -m lilac.triangles tarragon --magical  # strict, around one ingredient
+```
+
+```
+bit:       soursop + plum_wine + rhubarb   (ester / ether / methoxy)
+molecular: peanut_butter + soybean + roasted_chicken
+             linked by butyl acetate, 9-octadecenal, 4-ethylbenzaldehyde — three real molecules
+```
+
+A **triangle explorer** app (`scripts/build_triangles_app.py`) draws each triangle as a
+little diagram, with a Sensor-bits ↔ Shared-molecules toggle; click a vertex to re-anchor.
+
+```
+soursop + plum_wine + rhubarb
+   soursop–plum_wine via ester (fruity);  plum_wine–rhubarb via ether (oxygenated);
+   rhubarb–soursop via methoxy (phenolic)          # a closed loop of three different notes
+```
+
+The edge bar self-calibrates: anchored on a weakly-bridged hub (roasted cocoa, whose
+bridges are all one family) it still surfaces that ingredient's best triangles rather
+than freezing it out.
 
 ### Molecule inspector (HTML app)
 
@@ -163,29 +294,32 @@ python scripts/build_molecule_widget.py    # -> outputs/lilac_molecules.html
 ```
 
 The other side of the coin: pick a raw ingredient and see the **molecules inside it**,
-each rendered as its 55-bit sensor signature (a colour-coded strip + hex) with its SMILES,
+each rendered as its 72-bit sensor signature (a colour-coded strip + hex) with its SMILES,
 plus the ingredient's **superimposed signature** — each sensor shaded by the fraction of
-its molecules that fire it. The 55 sensors are colour-grouped (structural / large scaffold
-/ physicochemical / topology). Click a molecule to name its active sensors, or open the
-built-in **Bit index** for a plain-English gloss of what all 55 sensors detect.
+its molecules that fire it. The 72 sensors are colour-grouped (structural / large scaffold
+/ physicochemical / topology / composition). Click a molecule to name its active sensors, or open the
+built-in **Bit index** for a plain-English gloss of what all 72 sensors detect.
 
 ## Layout
 
 ```
 src/lilac/
-  sensors.py      # THE CORE: encode(smiles) -> uint8[55] + named bit table
+  sensors.py      # THE CORE: encode(smiles) -> uint8[72] + named bit table
   data.py         # fetch the Leffingwell set + union the 6.3k odorant library
   signatures.py   # per-flavor signatures (soft + crisp); bespoke from SMILES
   similarity.py   # hamming / jaccard / cosine, nearest-neighbour lookup
   mapviz.py       # 2-D map (UMAP -> t-SNE -> PCA fallback)
   validate.py     # kNN odor prediction + Morgan baseline + sanity checks
-  pairing.py      # flavor pairing: reinforce / bridge / contrast + CLI
-  ingredients.py  # 590 real ingredients as superimposed mixtures + IDF pairing CLI
+  pairing.py      # bit-level pairing: reinforce / bridge / contrast + CLI
+  shared.py       # compound-level pairing: the actual molecules two foods share + CLI
+  triangles.py    # closed A–B–C bridge cycles (three-way complements) + CLI
+  ingredients.py  # 595 real ingredients as superimposed mixtures + IDF pairing CLI
+  compose.py      # build a dish: coherence-led ensemble + surprise + hedonic warnings
 scripts/          # thin CLI entry points for the steps above
 tests/            # known molecules light up the expected sensors
 ```
 
-## The 55 sensors
+## The 72 sensors
 
 29 **structural "corners"** (SMARTS): hydroxyl, primary alcohol, phenol, carboxylic
 acid, ester, lactone, aldehyde, ketone, ether, acetal, methyl, gem-dimethyl, benzene
@@ -193,9 +327,9 @@ ring, fused aromatic, aliphatic ring, alkene, conjugated diene, terpene/isoprene
 **sulfur**, pyrazine, furan, halogen, acetyl, methoxy, methoxy-phenol, aromatic-N, long
 alkyl chain, branched chain.
 
-9 **larger scaffolds** (SMARTS): indole (jasmine/animalic), coumarin (hay/tonka),
+10 **larger scaffolds** (SMARTS): indole (jasmine/animalic), coumarin (hay/tonka),
 benzofuran, quinoline (leathery), thiazole (roasted), thiophene, decalin (woody/ambery),
-oxane ring, polyene.
+oxane ring, polyene, **phthalide** (celery/lovage/angelica).
 
 11 **physicochemical** (RDKit descriptors): MW low/high, logP low/high, high TPSA,
 flexible, H-bond donor, ≥3 H-bond acceptors, aromatic-rich, multi-ring, has stereocenter.
@@ -205,6 +339,14 @@ multi-isoprene (terpenoid skeleton), fused-ring system, polycyclic, large scaffo
 These read the molecule at a scale no local "corner" can — e.g. muscone (a 15-membered
 macrocyclic musk) now trips `macrocycle`, where before it was indistinguishable from a
 small ketone.
+
+16 **composition** (counts / atom budget / chain length): graded longest-carbon-chain
+(C2–3 / C4–5 / C6–9 / C10+), group counts (≥2 or ≥3 methyls, ≥2 hydroxyls, ≥2 esters),
+carbon budget (≤4 / 5–7 / 8–11 / 12+), and heteroatom budget (≥2/≥3 oxygens, ≥1/≥2
+nitrogens). Where the bits above ask *"which motifs are present?"*, these ask *"how many,
+and how big?"* — so the code carries a coarse molecular formula and starts to be
+*assemblable* back into a structure. Concretely, this is what finally separates the
+fruit-ester series (ethyl → isoamyl → n-hexyl acetate), which shared one code before.
 
 The panel is a starting point, not frozen — it's meant to be tuned against the sanity
 checks in `validate.py`.

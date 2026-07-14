@@ -1,13 +1,15 @@
-.PHONY: app apps serve pairings molecules data ingredients test
+.PHONY: app apps serve compose pairings molecules hub data ingredients test
 
-# One-command shortcut: build both web apps and serve them locally.
+# One-command shortcut: build the web apps + hub and serve them locally.
 app: ; python scripts/launch.py
 
-# Just (re)build the two HTML apps, no server.
+# Just (re)build the HTML apps + hub, no server.
 apps: ; python scripts/launch.py --build-only
 
+compose:   ; python scripts/build_compose_app.py
 pairings:  ; python scripts/build_app.py
 molecules: ; python scripts/build_molecule_widget.py
+hub:       ; python scripts/build_hub.py
 
 # Rebuild the underlying data tables (dataset, library, ingredients).
 data:

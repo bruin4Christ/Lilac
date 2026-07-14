@@ -1,10 +1,10 @@
-"""Aggregate the 40-bit codes into one signature per flavor.
+"""Aggregate the sensor codes into one signature per flavor.
 
     python scripts/build_signatures.py
 
 Reads ``data/molecules_encoded.pkl`` (run build_dataset.py first) and writes
 ``outputs/flavor_signatures.csv`` -- one row per descriptor with its molecule
-count, crisp 40-bit signature, and top sensors. Also prints a few readable
+count, crisp sensor signature, and top sensors. Also prints a few readable
 signatures.
 """
 

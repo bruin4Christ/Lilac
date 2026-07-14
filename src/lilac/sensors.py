@@ -1,6 +1,7 @@
-"""The 40-bit "nose".
+"""The sensor "nose".
 
-Every molecule is reduced to 40 on/off sensors. The design goal is *legibility*:
+Every molecule is reduced to a fixed panel of `N_BITS` on/off sensors (55 today,
+but the panel is a design knob meant to grow). The design goal is *legibility*:
 each bit has a name and a chemical/perceptual reason, so a flavor's signature can
 be read directly ("lemon = aldehydic + terpene + ester + ...").
 
@@ -15,7 +16,7 @@ Two kinds of sensor:
 The public surface is small:
 
     from lilac.sensors import encode, BIT_NAMES, N_BITS
-    bits = encode("CC(=O)OCC")      # -> np.uint8 array of length 40
+    bits = encode("CC(=O)OCC")      # -> np.uint8 array of length N_BITS
     dict(zip(BIT_NAMES, bits))      # -> readable {name: 0/1}
 
 `encode` returns None for SMILES RDKit cannot parse, so callers can drop them.
@@ -23,6 +24,7 @@ The public surface is small:
 
 from __future__ import annotations
 
+from collections import deque
 from typing import Callable, Optional
 
 import numpy as np
@@ -101,6 +103,11 @@ _LARGE_STRUCTURAL: list[tuple[str, str]] = [
     ("decalin",       "C1CCC2CCCCC2C1"),        # woody / ambery fused saturated bicyclic
     ("oxane_ring",    "[#6]1[#6][#6][#6][#6][OX2]1"),  # tetrahydropyran (rose oxide, sugars)
     ("polyene",       "C=CC=CC=C"),             # extended conjugation (carotenoid-like)
+    # celery / lovage / angelica. A 5-membered lactone fused to a 6-ring; the
+    # any-bond (~) fusion catches aromatic phthalides AND the dihydro forms
+    # (ligustilide, sedanolide), while excluding phthalic anhydride (its position-3
+    # ring atom is a second carbonyl). Fires on ~0.17% of the odorant library.
+    ("phthalide",     "O=C1O[#6;!$([CX3]=O)][#6]2~[#6]1~[#6]~[#6]~[#6]~[#6]~2"),
 ]
 
 
@@ -152,6 +159,88 @@ _LARGE_TOPO: list[tuple[str, Callable[[Chem.Mol], bool]]] = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# Composition sensors: counts, atom budget, and graded chain length.
+#
+# The sensors above answer "which motifs are present?" but not "how many?" or
+# "how big?" -- so a C4 acetate and a C18 acetate get the same code, and a
+# molecule with three methyls looks like one with a single methyl. This group
+# pushes the code toward being *assemblable* back into an approximate structure:
+# it adds a coarse molecular formula (carbon / oxygen / nitrogen counts),
+# threshold counts for the workhorse groups (methyl / hydroxyl / ester), and the
+# length of the longest carbon chain -- the axis that separates the fruit-ester
+# series (ethyl -> isoamyl -> hexyl ...). All thresholds, all still binary.
+# ---------------------------------------------------------------------------
+_CH3_P = Chem.MolFromSmarts("[CH3]")
+_OH_P = Chem.MolFromSmarts("[OX2H]")
+_ESTER_P = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
+
+
+def _n_element(mol: Chem.Mol, z: int) -> int:
+    return sum(1 for a in mol.GetAtoms() if a.GetAtomicNum() == z)
+
+
+def _longest_carbon_chain(mol: Chem.Mol) -> int:
+    """Carbons in the longest carbon-carbon path.
+
+    Computed as the diameter of the carbon-only bond graph via two BFS passes --
+    exact for acyclic skeletons (the common case for aroma molecules) and a sound
+    lower bound when rings are present. Cheap: O(atoms + bonds).
+    """
+    carbons = [a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() == 6]
+    if not carbons:
+        return 0
+    adj: dict[int, list[int]] = {i: [] for i in carbons}
+    for b in mol.GetBonds():
+        i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+        if i in adj and j in adj:
+            adj[i].append(j)
+            adj[j].append(i)
+
+    def bfs(src: int) -> tuple[int, int]:
+        seen = {src: 0}
+        far = src
+        q = deque([src])
+        while q:
+            n = q.popleft()
+            for nb in adj[n]:
+                if nb not in seen:
+                    seen[nb] = seen[n] + 1
+                    if seen[nb] > seen[far]:
+                        far = nb
+                    q.append(nb)
+        return far, seen[far]
+
+    u, _ = bfs(carbons[0])
+    _, dist = bfs(u)
+    return dist + 1
+
+
+_COMPOSITION: list[tuple[str, Callable[[Chem.Mol], bool]]] = [
+    # graded length of the longest carbon chain (long_alkyl_chain above only sees a
+    # straight >=6 CH2 run; these bucket the whole range and count through branches)
+    ("chain_c2_3",    lambda m: 2 <= _longest_carbon_chain(m) <= 3),
+    ("chain_c4_5",    lambda m: 4 <= _longest_carbon_chain(m) <= 5),
+    ("chain_c6_9",    lambda m: 6 <= _longest_carbon_chain(m) <= 9),
+    ("chain_c10plus", lambda m: _longest_carbon_chain(m) >= 10),
+    # group counts (the plain bits above only say "present")
+    ("methyl_2plus",   lambda m: len(m.GetSubstructMatches(_CH3_P)) >= 2),
+    ("methyl_3plus",   lambda m: len(m.GetSubstructMatches(_CH3_P)) >= 3),
+    ("hydroxyl_2plus", lambda m: len(m.GetSubstructMatches(_OH_P)) >= 2),
+    ("ester_2plus",    lambda m: len(m.GetSubstructMatches(_ESTER_P)) >= 2),
+    # carbon budget (coarse molecular size)
+    ("carbon_le4",   lambda m: _n_element(m, 6) <= 4),
+    ("carbon_5_7",   lambda m: 5 <= _n_element(m, 6) <= 7),
+    ("carbon_8_11",  lambda m: 8 <= _n_element(m, 6) <= 11),
+    ("carbon_12plus", lambda m: _n_element(m, 6) >= 12),
+    # heteroatom budget (rounds out the coarse formula)
+    ("oxygen_2plus",   lambda m: _n_element(m, 8) >= 2),
+    ("oxygen_3plus",   lambda m: _n_element(m, 8) >= 3),
+    ("nitrogen_1plus", lambda m: _n_element(m, 7) >= 1),
+    ("nitrogen_2plus", lambda m: _n_element(m, 7) >= 2),
+]
+
+
 def _compile(table: list[tuple[str, str]]) -> list[tuple[str, Chem.Mol]]:
     """Compile a (name, SMARTS) table, failing loudly on a bad pattern."""
     out = []
@@ -168,15 +257,17 @@ def _compile(table: list[tuple[str, str]]) -> list[tuple[str, Chem.Mol]]:
 _STRUCT_PATTERNS = _compile(_STRUCTURAL)
 _LARGE_PATTERNS = _compile(_LARGE_STRUCTURAL)
 
-# Bit order: small structural | large scaffolds | descriptors | large topology.
+# Bit order: small structural | large scaffolds | descriptors | large topology |
+# composition (counts / atom budget / chain length).
 _SMARTS_SENSORS = _STRUCT_PATTERNS + _LARGE_PATTERNS
-_PREDICATE_SENSORS = _DESCRIPTOR + _LARGE_TOPO
+_PREDICATE_SENSORS = _DESCRIPTOR + _LARGE_TOPO + _COMPOSITION
 
 BIT_NAMES: list[str] = (
     [name for name, _ in _STRUCTURAL]
     + [name for name, _ in _LARGE_STRUCTURAL]
     + [name for name, _ in _DESCRIPTOR]
     + [name for name, _ in _LARGE_TOPO]
+    + [name for name, _ in _COMPOSITION]
 )
 N_BITS: int = len(BIT_NAMES)
 
@@ -228,7 +319,7 @@ def encode_frame(smiles_list) -> tuple[np.ndarray, np.ndarray]:
 
 
 def bits_to_string(bits: np.ndarray) -> str:
-    """Render a 40-bit code as its compact binary string, e.g. '0101...'."""
+    """Render an N_BITS code as its compact binary string, e.g. '0101...'."""
     return "".join(str(int(b)) for b in bits)
 
 

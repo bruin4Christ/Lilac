@@ -1,6 +1,6 @@
 """The 2-D olfactory map.
 
-Project the 40-bit codes into two dimensions and colour each molecule by its
+Project the sensor codes into two dimensions and colour each molecule by its
 dominant odor label. Nearby points share sensors, so odor families should form
 visible neighbourhoods -- the picture your intuition was reaching for.
 

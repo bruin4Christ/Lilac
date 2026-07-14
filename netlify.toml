@@ -1,0 +1,7 @@
+# Netlify configuration for hosting the Lilac web apps (free, automatic HTTPS).
+# The site is pre-built static HTML in docs/, so there is no build step to run --
+# Netlify just serves that folder. Import this repo at https://app.netlify.com and
+# it picks these settings up automatically.
+[build]
+  publish = "docs"
+  command = ""

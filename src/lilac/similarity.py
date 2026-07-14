@@ -1,4 +1,4 @@
-"""Distances and nearest-neighbour lookups over 40-bit codes.
+"""Distances and nearest-neighbour lookups over sensor codes.
 
 Two molecules (or two flavor signatures) are compared bit-for-bit. Hamming
 distance counts differing sensors; Jaccard distance ignores the many bits that
@@ -16,11 +16,16 @@ def hamming(a: np.ndarray, b: np.ndarray) -> int:
 
 
 def jaccard_distance(a: np.ndarray, b: np.ndarray) -> float:
-    """1 - |A & B| / |A | B| over the 'on' bits. 0.0 when both are all-zero."""
+    """1 - |A & B| / |A | B| over the 'on' bits.
+
+    An empty signature carries no signal, so a pair with no 'on' bits between
+    them is treated as maximally *distant* (1.0), never as an identical match --
+    otherwise two odourless/unencodable codes would spuriously pair perfectly.
+    """
     ab = np.logical_and(a, b).sum()
     aub = np.logical_or(a, b).sum()
     if aub == 0:
-        return 0.0
+        return 1.0
     return 1.0 - ab / aub
 
 
@@ -28,13 +33,15 @@ def cosine_distance(a: np.ndarray, b: np.ndarray) -> float:
     """1 - cosine similarity between two real vectors (e.g. soft signatures).
 
     More sensitive than crisp Hamming for comparing flavor signatures, because it
-    uses each sensor's on-fraction rather than a 0/1 threshold. 0.0 when either
-    vector is all-zero (nothing to compare).
+    uses each sensor's on-fraction rather than a 0/1 threshold. A zero vector has
+    no direction and carries no signal, so it is treated as maximally *distant*
+    (1.0) rather than identical -- a zero query must not "reinforce" with
+    everything.
     """
     na = np.linalg.norm(a)
     nb = np.linalg.norm(b)
     if na == 0 or nb == 0:
-        return 0.0
+        return 1.0
     return 1.0 - float(np.dot(a, b) / (na * nb))
 
 
@@ -43,14 +50,15 @@ def weighted_cosine_distance(a: np.ndarray, b: np.ndarray, weights: np.ndarray) 
 
     Used to down-weight ubiquitous sensors (methyl, ether) that fire for almost
     every ingredient, so discriminative sensors (sulfur, pyrazine, macrocycle)
-    drive the similarity. 0.0 if either scaled vector is all-zero.
+    drive the similarity. A scaled vector with no signal is treated as maximally
+    *distant* (1.0), never as an identical match.
     """
     aw = a * weights
     bw = b * weights
     na = np.linalg.norm(aw)
     nb = np.linalg.norm(bw)
     if na == 0 or nb == 0:
-        return 0.0
+        return 1.0
     return 1.0 - float(np.dot(aw, bw) / (na * nb))
 
 

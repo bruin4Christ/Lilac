@@ -1,9 +1,9 @@
-"""Load the odor dataset and attach a 40-bit code to every molecule.
+"""Load the odor dataset and attach a sensor code to every molecule.
 
     python scripts/build_dataset.py
 
 Writes ``data/molecules_encoded.pkl`` (the joined dataset plus a `code` column,
-one uint8[40] array per row) and prints a short report. Unparseable SMILES are
+one uint8[N_BITS] array per row) and prints a short report. Unparseable SMILES are
 dropped and counted.
 """
 

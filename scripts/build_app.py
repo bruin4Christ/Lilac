@@ -18,9 +18,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import numpy as np  # noqa: E402
 
-from lilac.data import load_flavor_network  # noqa: E402
+from lilac.data import load_flavor_network, load_odorant_library  # noqa: E402
 from lilac.ingredients import build_ingredient_signatures, idf_weights  # noqa: E402
 from lilac.sensors import BIT_NAMES  # noqa: E402
+from lilac.shared import compound_idf, shared_pairings  # noqa: E402
 
 TOP = 10  # partners per list
 
@@ -50,6 +51,20 @@ def build_data() -> dict:
         order = np.argsort(-soft[i])
         return [int(b) for b in order if b != methyl and soft[i][b] > 0][:k]
 
+    # Compound-level layer (the fourth category): the actual molecules two
+    # ingredients share, distinctive ones weighted highest. A global compound-name
+    # vocabulary keeps the payload small -- shared lists reference it by index.
+    idx_of = {n: i for i, n in enumerate(names)}
+    cidf, _ = compound_idf(df)
+    smi_to_cname = dict(zip(load_odorant_library()["smiles"],
+                            load_odorant_library()["name"].astype(str)))
+    cvocab: dict[str, int] = {}
+
+    def cvocab_idx(smi: str) -> int:
+        if smi not in cvocab:
+            cvocab[smi] = len(cvocab)
+        return cvocab[smi]
+
     records = []
     for i, name in enumerate(names):
         sims = S[i]
@@ -57,25 +72,42 @@ def build_data() -> dict:
         contrast = np.argsort(sims)
         contrast = [j for j in contrast if sims[j] >= 0][:TOP]  # skip the -1 self
         valid = sims[sims >= 0]
-        target = (valid.min() + valid.max()) / 2 if valid.size else 0.0
+        # Bridge centre = a percentile of THIS ingredient's own partner
+        # similarities, so the "middle overlap" self-calibrates per ingredient
+        # (garlic is far from everything, blueberry close to everything).
+        target = float(np.percentile(valid, 65)) if valid.size else 0.0
         bridge = np.argsort(np.abs(sims - target))
         bridge = [j for j in bridge if sims[j] >= 0][:TOP]
 
         def pack(idxs):
             return [[int(j), round(float(sims[j]), 3), note(i, j)] for j in idxs]
 
+        # Shared-compound partners: [partner_idx, n_shared, wJaccard, [top compound idxs]]
+        shared = []
+        for r in shared_pairings(name, df=df, top=TOP, idf=cidf):
+            tops = [cvocab_idx(s) for s in r["shared"][:3]]
+            shared.append([idx_of[r["ingredient"]], r["n_shared"],
+                           round(r["weighted_jaccard"], 3), tops])
+
         records.append({
             "p": top_sensors(i),
             "r": pack(reinforce),
             "b": pack(bridge),
             "c": pack(contrast),
+            "s": shared,
         })
+
+    # Ordered compound-name vocabulary (index -> readable name).
+    compounds = [None] * len(cvocab)
+    for smi, ci in cvocab.items():
+        compounds[ci] = smi_to_cname.get(smi, smi)
 
     return {
         "names": names,
         "cats": [cats[n] for n in names],
         "ncomp": [int(sigs[n].n_molecules) for n in names],
         "sensors": BIT_NAMES,
+        "compounds": compounds,
         "recs": records,
     }
 
@@ -94,7 +126,7 @@ TEMPLATE = r"""<style>
 :root{
   --bg:#FAF9FE; --surface:#FFFFFF; --surface-2:#F4F1FC; --border:#E7E2F4;
   --text:#1B1726; --muted:#6C6482; --accent:#7C5CF0; --accent-soft:#EEE9FE;
-  --reinforce:#2E9E6B; --bridge:#C0851C; --contrast:#5670D6;
+  --reinforce:#2E9E6B; --bridge:#C0851C; --contrast:#5670D6; --shared:#C2568F;
   --track:#EDE9F8;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
@@ -103,18 +135,18 @@ TEMPLATE = r"""<style>
   :root{
     --bg:#121019; --surface:#1A1624; --surface-2:#221C30; --border:#2E2740;
     --text:#ECE7F7; --muted:#9A93AE; --accent:#A78BFF; --accent-soft:#241C3A;
-    --reinforce:#4FBD86; --bridge:#E0A63C; --contrast:#8AA0FF; --track:#26203440;
+    --reinforce:#4FBD86; --bridge:#E0A63C; --contrast:#8AA0FF; --shared:#E58BB8; --track:#26203440;
   }
 }
 :root[data-theme="light"]{
   --bg:#FAF9FE; --surface:#FFFFFF; --surface-2:#F4F1FC; --border:#E7E2F4;
   --text:#1B1726; --muted:#6C6482; --accent:#7C5CF0; --accent-soft:#EEE9FE;
-  --reinforce:#2E9E6B; --bridge:#C0851C; --contrast:#5670D6; --track:#EDE9F8;
+  --reinforce:#2E9E6B; --bridge:#C0851C; --contrast:#5670D6; --shared:#C2568F; --track:#EDE9F8;
 }
 :root[data-theme="dark"]{
   --bg:#121019; --surface:#1A1624; --surface-2:#221C30; --border:#2E2740;
   --text:#ECE7F7; --muted:#9A93AE; --accent:#A78BFF; --accent-soft:#241C3A;
-  --reinforce:#4FBD86; --bridge:#E0A63C; --contrast:#8AA0FF; --track:#26203440;
+  --reinforce:#4FBD86; --bridge:#E0A63C; --contrast:#8AA0FF; --shared:#E58BB8; --track:#26203440;
 }
 *{box-sizing:border-box}
 .wrap{max-width:1140px;margin:0 auto;padding:28px 20px 72px;color:var(--text);
@@ -156,8 +188,9 @@ body{background:var(--bg)}
 .chip{font-family:var(--mono);font-size:12px;color:var(--accent);background:var(--accent-soft);
   border:1px solid var(--border);border-radius:999px;padding:3px 9px}
 
-.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-@media (max-width:820px){.cols{grid-template-columns:1fr}}
+.cols{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media (max-width:1000px){.cols{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:560px){.cols{grid-template-columns:1fr}}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;
   overflow:hidden;display:flex;flex-direction:column}
 .card h2{font-size:15px;margin:0;padding:14px 16px 4px;display:flex;align-items:center;gap:8px}
@@ -166,6 +199,7 @@ body{background:var(--bg)}
 .reinforce .accentbar{background:var(--reinforce)}
 .bridge .accentbar{background:var(--bridge)}
 .contrast .accentbar{background:var(--contrast)}
+.shared .accentbar{background:var(--shared)}
 .row{display:grid;grid-template-columns:18px 1fr auto;gap:8px 10px;align-items:center;
   padding:9px 16px;border-bottom:1px solid var(--border)}
 .row:last-child{border-bottom:0}
@@ -186,6 +220,7 @@ body{background:var(--bg)}
 .reinforce .meter i{background:var(--reinforce)}
 .bridge .meter i{background:var(--bridge)}
 .contrast .meter i{background:var(--contrast)}
+.shared .meter i{background:var(--shared)}
 .foot{margin-top:26px;color:var(--muted);font-size:12.5px;max-width:78ch}
 .foot code{font-family:var(--mono);background:var(--surface-2);padding:1px 5px;border-radius:5px}
 @media (prefers-reduced-motion:no-preference){
@@ -216,7 +251,7 @@ body{background:var(--bg)}
 
   <div class="cols">
     <div class="card reinforce"><h2><span class="dot accentbar"></span>Reinforce</h2>
-      <div class="rule">Most shared aroma — pair by similarity (the “shared-compound” idea)</div>
+      <div class="rule">Most alike by <b>sensor bits</b> — pair by overall similarity</div>
       <div id="list-r"></div></div>
     <div class="card bridge"><h2><span class="dot accentbar"></span>Bridge</h2>
       <div class="rule">Mid overlap — some notes shared, some new. Where surprising pairings live</div>
@@ -224,17 +259,22 @@ body{background:var(--bg)}
     <div class="card contrast"><h2><span class="dot accentbar"></span>Contrast</h2>
       <div class="rule">Least overlap — pairing by opposition</div>
       <div id="list-c"></div></div>
+    <div class="card shared"><h2><span class="dot accentbar"></span>Shared</h2>
+      <div class="rule">Actual <b>molecules</b> in common — the original food-pairing idea</div>
+      <div id="list-s"></div></div>
   </div>
 
-  <p class="foot">Aroma-only hypotheses from ~590 ingredients (Ahn <em>et al.</em> Flavor
-    Network × Lilac sensors). Compounds are weighted equally (no concentrations), so read
-    these as leads, not verdicts — taste, texture and culture decide the plate. Click any
-    ingredient to re-center; <code>🎲</code> jumps somewhere random.</p>
+  <p class="foot">Three lenses (<b>reinforce / bridge / contrast</b>) compare the
+    <b>sensor bits</b> — an abstraction of structure. The fourth (<b>shared</b>) compares the
+    actual aroma <b>molecules</b> two foods have in common, distinctive ones weighted highest
+    (Ahn <em>et al.</em> Flavor Network). Aroma-only hypotheses from ~595 ingredients — read
+    them as leads, not verdicts. Click any ingredient to re-center; <code>🎲</code> jumps
+    somewhere random.</p>
 </div>
 
 <script>
 const DATA = /*__DATA__*/;
-const {names, cats, ncomp, sensors, recs} = DATA;
+const {names, cats, ncomp, sensors, compounds, recs} = DATA;
 const el = id => document.getElementById(id);
 const cap = s => s.replace(/_/g," ");
 
@@ -263,6 +303,27 @@ function rowsHTML(list, mode){
   }).join("");
 }
 
+// ---- shared-compound rows: partner + count + the molecules in common ----
+function sharedRowsHTML(list){
+  if(!list || !list.length) return `<div class="row"><span class="sub">no shared compounds found</span></div>`;
+  const max = Math.max(...list.map(p=>p[2]), 0.001);
+  return list.map((p,k)=>{
+    const [j,n,wj,comps] = p;
+    const names_ = comps.map(c=>compounds[c]).filter(Boolean);
+    const extra = n - names_.length;
+    const via = names_.length
+      ? `<span class="via">shares <em>${names_[0]}</em>${extra>0?` +${extra} more`:``}</span>` : "";
+    const w = Math.max(4, Math.round(100*wj/max));
+    return `<div class="row">
+      <span class="rank">${k+1}</span>
+      <button class="pname" data-go="${j}">${cap(names[j])}</button>
+      <span class="sim">${n}</span>
+      <span class="sub"><span class="tag">${cats[j]}</span>${via}</span>
+      <span class="meter"><i style="width:${w}%"></i></span>
+    </div>`;
+  }).join("");
+}
+
 function render(i){
   const r = recs[i];
   el("base").innerHTML = `
@@ -276,6 +337,7 @@ function render(i){
   el("list-r").innerHTML = rowsHTML(r.r,"r");
   el("list-b").innerHTML = rowsHTML(r.b,"b");
   el("list-c").innerHTML = rowsHTML(r.c,"c");
+  el("list-s").innerHTML = sharedRowsHTML(r.s);
   el("q").value = cap(names[i]);
   history.replaceState(null,"", "#"+encodeURIComponent(names[i]));
   document.querySelectorAll(".pname").forEach(b=>{

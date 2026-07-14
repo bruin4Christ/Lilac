@@ -1,12 +1,13 @@
-"""Build both Lilac web apps and serve them locally in one step.
+"""Build the Lilac web apps + hub and serve them locally in one step.
 
-    python scripts/launch.py              # build both, serve, open a browser
+    python scripts/launch.py              # build all, serve, open a browser
     python scripts/launch.py --build-only # just regenerate the HTML, don't serve
     python scripts/launch.py --port 9000  # serve on a specific port
 
-The two apps are self-contained HTML files written to outputs/. This script
-regenerates them (so they reflect the current data/sensors) and starts a small
-local web server rooted at outputs/, printing links to each app.
+The apps are self-contained HTML files written to outputs/. This script
+regenerates them (so they reflect the current data/sensors) plus a hub
+(index.html) that links them, and starts a small local web server rooted at
+outputs/, printing a link to each.
 """
 
 from __future__ import annotations
@@ -22,14 +23,21 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "outputs"
 
+# The hub (index.html) is built last so it links pages that already exist; it is
+# listed first so it is the landing page and the one opened in the browser.
 APPS = [
+    ("build_hub.py", "index.html", "🏠 Hub"),
+    ("build_compose_app.py", "lilac_compose.html", "🍽 Composition studio"),
     ("build_app.py", "lilac_pairings.html", "🌸 Pairing explorer"),
+    ("build_triangles_app.py", "lilac_triangles.html", "△ Triangle explorer"),
     ("build_molecule_widget.py", "lilac_molecules.html", "🔬 Molecule inspector"),
 ]
 
 
 def build() -> None:
-    for script, _, label in APPS:
+    # Build the app pages first, then the hub that links them.
+    for script, _, label in [a for a in APPS if a[0] != "build_hub.py"] + \
+            [a for a in APPS if a[0] == "build_hub.py"]:
         print(f"building {label} …")
         subprocess.run([sys.executable, str(ROOT / "scripts" / script)], check=True)
 
