@@ -66,7 +66,10 @@ def main() -> None:
     ap.add_argument("query", help="ingredient name (e.g. blueberry), reference aroma, or SMILES list")
     ap.add_argument("--mode", choices=["reinforce", "bridge", "contrast", "all"],
                     default="all")
-    ap.add_argument("--target", type=float, default=0.20)
+    ap.add_argument("--target", type=float, default=None,
+                    help="explicit absolute bridge similarity (overrides --target-pct)")
+    ap.add_argument("--target-pct", type=float, default=65.0,
+                    help="bridge centre as a percentile of the query's own partners")
     ap.add_argument("--top", type=int, default=8)
     ap.add_argument("--min-compounds", type=int, default=5)
     ap.add_argument("--no-idf", action="store_true", help="disable IDF sensor weighting")
@@ -88,14 +91,17 @@ def main() -> None:
     print(f"  active sensors: {', '.join(active_names(query.crisp)) or '(none above threshold)'}")
     print(f"  weighting: {'IDF' if weights is not None else 'plain cosine'}\n")
 
+    bridge_label = (f"~{args.target:.0%} sim" if args.target is not None
+                    else f"p{args.target_pct:.0f} of own partners")
     modes = ["reinforce", "bridge", "contrast"] if args.mode == "all" else [args.mode]
     titles = {"reinforce": "MOST alike (reinforce)",
-              "bridge": f"~{args.target:.0%} overlap (bridge)",
+              "bridge": f"MIDDLE overlap (bridge, {bridge_label})",
               "contrast": "MOST contrast (opposition)"}
     for mode in modes:
         print(f"### {titles[mode]}")
         for r in rank_pairings(query, sigs, mode=mode, target=args.target,
-                               top=args.top, weights=weights, band_on="cosine"):
+                               target_pct=args.target_pct, top=args.top,
+                               weights=weights, band_on="cosine"):
             print(f"  {r['flavor']:22} n={r['n']:4}  sim={r['cosine']:.3f}  jac={r['jaccard']:.2f}")
         print()
 

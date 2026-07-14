@@ -82,7 +82,8 @@ def rank_pairings(
     query: FlavorSignature,
     flavor_sigs: dict[str, FlavorSignature],
     mode: str = "reinforce",
-    target: float = 0.20,
+    target: float | None = None,
+    target_pct: float = 65.0,
     top: int = 10,
     weights: np.ndarray | None = None,
     band_on: str = "jaccard",
@@ -95,7 +96,17 @@ def rank_pairings(
     `band_on` chooses what the reinforce/bridge/contrast bands sort on: ``jaccard``
     (crisp bitmask overlap -- good for sparse single-flavor signatures) or
     ``cosine`` (soft similarity -- needed for dense ingredient mixtures whose crisp
-    signatures collapse). For ``cosine`` bands, `target` is a similarity level.
+    signatures collapse).
+
+    Bridge target
+    -------------
+    An interesting "bridge" partner sits at a *middle* overlap -- but the absolute
+    overlap that counts as "middle" is completely different from one query to the
+    next (a distinctive ingredient like garlic is far from everything; a central
+    one like blueberry is close to everything). So the bridge centre defaults to a
+    *percentile of this query's own* partner-similarity distribution
+    (`target_pct`, default 65), which self-calibrates per query. Pass an explicit
+    absolute `target` to override with a fixed overlap level instead.
     """
     def cos_sim(a, b):
         d = (weighted_cosine_distance(a, b, weights) if weights is not None
@@ -119,20 +130,25 @@ def rank_pairings(
     elif mode == "contrast":
         scored.sort(key=lambda r: (r[key], r["cosine"]))
     elif mode == "bridge":
-        tgt = target if band_on == "jaccard" else _bridge_target(scored, target)
-        scored.sort(key=lambda r: abs(r[key] - tgt))
+        center = _bridge_center(scored, key, target, target_pct)
+        scored.sort(key=lambda r: abs(r[key] - center))
     else:
         raise ValueError(f"unknown mode {mode!r}")
     return scored[:top]
 
 
-def _bridge_target(scored: list[dict], target: float) -> float:
-    """Cosine-band bridge target: the midpoint of the observed similarity range,
-    unless an explicit non-default target similarity was given."""
-    if abs(target - 0.20) > 1e-9:   # user passed an explicit similarity target
+def _bridge_center(scored: list[dict], key: str, target: float | None,
+                   target_pct: float) -> float:
+    """Where the bridge band centres.
+
+    An explicit absolute `target` wins; otherwise take the `target_pct` percentile
+    of this query's own partner values on `key` -- a robust, self-calibrating
+    "middle overlap" that adapts to how central or distinctive the query is.
+    """
+    if target is not None:
         return target
-    sims = [r["cosine"] for r in scored]
-    return (min(sims) + max(sims)) / 2 if sims else target
+    values = [r[key] for r in scored]
+    return float(np.percentile(values, target_pct)) if values else 0.0
 
 
 def _resolve_query(spec: str) -> tuple[FlavorSignature, list[str]]:
@@ -152,7 +168,10 @@ def main() -> None:
     ap.add_argument("query", help="reference aroma name (e.g. blueberry) or comma-separated SMILES")
     ap.add_argument("--mode", choices=["reinforce", "bridge", "contrast", "all"],
                     default="all")
-    ap.add_argument("--target", type=float, default=0.20, help="bridge overlap target")
+    ap.add_argument("--target", type=float, default=None,
+                    help="explicit absolute bridge overlap (overrides --target-pct)")
+    ap.add_argument("--target-pct", type=float, default=65.0,
+                    help="bridge centre as a percentile of the query's own partners")
     ap.add_argument("--top", type=int, default=8)
     ap.add_argument("--min-molecules", type=int, default=8,
                     help="ignore dataset flavors rarer than this")
@@ -175,14 +194,16 @@ def main() -> None:
     print(f"\nQuery: {query.descriptor}  ({query.n_molecules} compounds)")
     print(f"  active sensors: {', '.join(active_names(query.crisp))}\n")
 
+    bridge_label = (f"~{args.target:.0%} overlap" if args.target is not None
+                    else f"p{args.target_pct:.0f} of own partners")
     modes = ["reinforce", "bridge", "contrast"] if args.mode == "all" else [args.mode]
     titles = {"reinforce": "MOST overlap (reinforce)",
-              "bridge": f"~{args.target:.0%} overlap (bridge)",
+              "bridge": f"MIDDLE overlap (bridge, {bridge_label})",
               "contrast": "MINIMAL overlap (contrast)"}
     for mode in modes:
         print(f"### {titles[mode]}")
-        for r in rank_pairings(query, flavor_sigs, mode=mode,
-                               target=args.target, top=args.top):
+        for r in rank_pairings(query, flavor_sigs, mode=mode, target=args.target,
+                               target_pct=args.target_pct, top=args.top):
             print(f"  {r['flavor']:14} n={r['n']:4}  "
                   f"jaccard={r['jaccard']:.2f}  cosine={r['cosine']:.2f}")
         print()

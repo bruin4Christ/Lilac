@@ -57,7 +57,10 @@ def build_data() -> dict:
         contrast = np.argsort(sims)
         contrast = [j for j in contrast if sims[j] >= 0][:TOP]  # skip the -1 self
         valid = sims[sims >= 0]
-        target = (valid.min() + valid.max()) / 2 if valid.size else 0.0
+        # Bridge centre = a percentile of THIS ingredient's own partner
+        # similarities, so the "middle overlap" self-calibrates per ingredient
+        # (garlic is far from everything, blueberry close to everything).
+        target = float(np.percentile(valid, 65)) if valid.size else 0.0
         bridge = np.argsort(np.abs(sims - target))
         bridge = [j for j in bridge if sims[j] >= 0][:TOP]
 
