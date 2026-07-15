@@ -108,6 +108,29 @@ def _base_families(base_soft: np.ndarray, cw: np.ndarray, k: float = 0.35) -> se
     return fams or {"other"}
 
 
+def _register_strengths(base_soft: np.ndarray, cw: np.ndarray) -> dict[str, float]:
+    """How strongly the base occupies each note family, normalized to its top note."""
+    v = base_soft * cw
+    d: dict[str, float] = {}
+    for i in np.argsort(-v)[:14]:
+        f = note_family(BIT_NAMES[int(i)])
+        d[f] = max(d.get(f, 0.0), float(v[i]))
+    mx = max(d.values(), default=1.0) or 1.0
+    return {f: s / mx for f, s in d.items()}
+
+
+def _lift_consonance(lift_family: str, base_soft: np.ndarray, cw: np.ndarray) -> float:
+    """Consonance of a lift, weighted by how strongly the base holds each register.
+
+    A clash only counts to the degree the base *strongly* occupies the clashing
+    register: garlic's sulfur wrecks strawberry (all sweet) but not tomato (whose
+    fruity note is weak). = 1 - worst magnitude-weighted dissonance.
+    """
+    clash = max((st * (1.0 - consonance(lift_family, reg))
+                 for reg, st in _register_strengths(base_soft, cw).items()), default=0.0)
+    return 1.0 - clash
+
+
 def analyze(base: str, partner: str, sigs: dict, idf: np.ndarray) -> Affinity:
     """The anchor + lift (+ consonance) between a base and one partner.
 
@@ -124,7 +147,7 @@ def analyze(base: str, partner: str, sigs: dict, idf: np.ndarray) -> Affinity:
     li = int(np.argmax(adds))
     lfam = note_family(BIT_NAMES[li])
     bfam = _base_family(a, cw)
-    con = min(consonance(lfam, bf) for bf in _base_families(a, cw))
+    con = _lift_consonance(lfam, a, cw)
     return Affinity(
         partner=partner,
         anchor_sensor=BIT_NAMES[ai], anchor_family=note_family(BIT_NAMES[ai]),

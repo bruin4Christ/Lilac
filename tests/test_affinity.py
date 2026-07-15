@@ -1,6 +1,7 @@
-"""Anchor + Lift pairing model (no network needed)."""
+"""Anchor + Lift pairing model (synthetic unit tests + a corpus separation check)."""
 
 import pandas as pd
+import pytest
 
 from lilac.affinity import analyze, consonance, rank, register, suggest_dish
 from lilac.ingredients import build_ingredient_signatures, idf_weights
@@ -72,3 +73,28 @@ def test_suggest_dish_returns_a_deepener_and_a_lifter():
     d = suggest_dish("base", sigs, idf, cats)
     assert d["deepener"] and d["lifter"]
     assert d["deepener"].partner != d["lifter"].partner
+
+
+def test_consonance_separates_the_good_and_bad_corpus():
+    # Integration check against the labelled corpus (needs the ingredient dataset;
+    # skips offline). The model's lift-consonance should rate known-good pairs higher
+    # than known-clashing ones -- a regression guard as the corpus grows.
+    import numpy as np
+    from lilac.canon import GOOD_PAIRS, BAD_PAIRS
+    try:
+        from lilac.data import load_flavor_network
+        df = load_flavor_network(min_compounds=5)
+    except Exception:
+        pytest.skip("ingredient dataset unavailable (offline)")
+    sigs = build_ingredient_signatures(df=df)
+    idf = idf_weights(sigs)
+
+    def worst_con(a, b):   # lowest consonance across both framings = can this pair clash?
+        return min(analyze(a, b, sigs, idf).consonance,
+                   analyze(b, a, sigs, idf).consonance)
+
+    good = [worst_con(a, b) for a, b in GOOD_PAIRS if a in sigs and b in sigs]
+    bad = [worst_con(a, b) for a, b in BAD_PAIRS if a in sigs and b in sigs]
+    assert good and bad
+    # known-good pairs are meaningfully more consonant than known-clashing ones
+    assert np.mean(good) - np.mean(bad) > 0.15
